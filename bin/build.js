@@ -61,9 +61,18 @@ const shareQrpCore = {
 	}
 };
 
+// Write via a temp file + rename so concurrent builds never see a torn file.
+const writeAtomic = (file, contents) => {
+	const temp = `${file}.${process.pid}.tmp`;
+
+	fs.writeFileSync(temp, contents);
+	fs.renameSync(temp, file);
+};
+
 const buildJs = () => esbuild.build({
 	entryPoints: [ENTRY],
 	outfile: JS_OUT,
+	write: false,
 	bundle: true,
 	format: "esm",
 	target: "es2020",
@@ -72,13 +81,15 @@ const buildJs = () => esbuild.build({
 	sourcesContent: true,
 	legalComments: "inline",
 	plugins: [shareQrpCore]
-});
+}).then((result) => result.outputFiles.forEach((file) => writeAtomic(file.path, file.contents)));
 
 const buildCss = () => {
-	execFileSync(TAILWIND, ["-i", CSS_IN, "-o", CSS_OUT, "--minify"], { stdio: ["ignore", "ignore", "inherit"] });
+	const temp = `${CSS_OUT}.${process.pid}.tmp`;
+
+	execFileSync(TAILWIND, ["-i", CSS_IN, "-o", temp, "--minify"], { stdio: ["ignore", "ignore", "inherit"] });
+	fs.renameSync(temp, CSS_OUT);
 };
 
-fs.rmSync(OUTDIR, { recursive: true, force: true });
 fs.mkdirSync(OUTDIR, { recursive: true });
 
 // Fail the build if anything but the bare core is imported from qrp.

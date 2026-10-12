@@ -48,7 +48,7 @@
 		"lint": "eslint index.js components utils icons bin test",
 		"prepack": "node bin/build.js",
 		"prepare": "husky",
-		"build:demo": "node bin/build.js && tailwindcss -i demo/demo.css -o demo/demo.built.css",
+		"build:demo": "node bin/build.js && tailwindcss -i demo/demo.css -o demo/demo.built.css.tmp && mv demo/demo.built.css.tmp demo/demo.built.css",
 		"demo": "npm run build:demo && python3 -m http.server 8000"
 	},
 	"lint-staged": {

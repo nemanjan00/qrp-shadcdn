@@ -5,6 +5,12 @@ import { state, el, mount, effect, Button } from "@nemanjan00/qrp-shadcdn";
 import { demos } from "./demos/registry.js";
 import "./demos/basics.js";
 import "./demos/overlays.js";
+import "./demos/inputs.js";
+import "./demos/menus.js";
+import "./demos/selects.js";
+import "./demos/misc.js";
+import "./demos/data.js";
+import "./demos/layout.js";
 
 const theme = state({ dark: window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches });
 

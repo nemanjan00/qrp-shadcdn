@@ -1,146 +1,80 @@
 /**
- * utils/toaster.js — sonner's behavior on top of qrp's `toasts` store.
+ * utils/toaster.js — sonner's API over qrp's `toasts` controller.
  *
- * qrp's `createToasts()` owns the reactive `store.items`, the event-bus wiring
- * (`notify.success("…")` / `bus.emit("error", …)`), message dedupe and
- * `dismiss(id)`. This layer adds what sonner needs and qrp's controller doesn't
- * expose yet (see the qrp gaps in the README / TODO):
+ * qrp's `createToasts()` owns the toasts: the reactive `store.items`, ids and
+ * update-in-place (`push` with `meta.id`), per-toast `duration` countdowns,
+ * `pause`/`resume`, the exit phase (`exitMs`: an item is `removed: true` while
+ * it animates out) and the event-bus wiring (`notify.success("…")`). This layer
+ * only maps sonner's semantics onto it:
  *
- * - ids you choose + update-in-place (`toast.promise`, `toast.loading` → success)
- * - per-toast meta: description, action, cancel, icon, duration
- * - countdowns that pause (hover, hidden tab), sticky `loading`
- * - an exit phase: `removed: true` for `exitMs` before qrp's dismiss() drops it
- *
- * Toasts pushed by qrp itself (from the bus) get the same countdown and exit.
+ * - its own `toast-N` ids (sonner never dedupes; qrp dedupes id-less strings)
+ * - a configurable default duration, sticky `loading`
+ * - `limit` (oldest live toasts leave first)
+ * - sonner's `onDismiss` / `onAutoClose` callbacks
+ * - bus toasts (`notify.*`) get the same default duration
  */
 
-import { state, effect, batch, untracked } from "@nemanjan00/qrp";
+import { effect, batch, untracked } from "@nemanjan00/qrp";
 
 const DEFAULT_DURATION = 4000;
-const DEFAULT_EXIT_MS = 400;
-
-const now = () => Date.now();
 
 /**
- * Wrap a qrp toasts controller (`createToasts({ timeout: 0 })` — this layer
- * runs the timers).
+ * Wrap a qrp toasts controller. Create it with `timeout: 0` (this layer sets
+ * each toast's duration) and the `exitMs` your exit animation takes.
  *
  * @param {object} controller a qrp createToasts() controller
  * @param {object} [options]
  * @param {number} [options.duration] default auto-dismiss in ms (Infinity = sticky)
- * @param {number} [options.exitMs] how long a dismissed toast stays for its exit
  * @param {number} [options.limit] keep at most this many live toasts (oldest go)
- * @returns {object} `{ controller, items, add, update, dismiss, pause, resume, configure }`
+ * @returns {object} `{ controller, items, add, update, dismiss, pause, resume, configure, config }`
  */
 export const toastLayer = (controller, options = {}) => {
 	const config = {
 		duration: options.duration || DEFAULT_DURATION,
-		exitMs: options.exitMs === undefined ? DEFAULT_EXIT_MS : options.exitMs,
 		limit: options.limit || Infinity
 	};
 	const store = controller.store;
-	const status = state({ paused: false });
-	const timers = new Map();
-	const scheduled = new Set();
+	const manual = new Set();
+	const closed = new Set();
+	const timed = new Set();
 	let counter = 0;
 
 	const items = () => store.items;
 	const find = (id) => untracked(() => store.items.find((item) => item.id === id));
+	const live = () => untracked(() => store.items.filter((item) => !item.removed));
 
-	const clearTimer = (id) => {
-		const timer = timers.get(id);
-
-		if(timer) {
-			clearTimeout(timer.handle);
-			timers.delete(id);
+	const durationOf = (data) => {
+		if(data.duration !== undefined && data.duration !== null) {
+			return data.duration;
 		}
+
+		return data.variant === "loading" ? Infinity : config.duration;
 	};
 
+	/**
+	 * Dismiss one toast, or every live one. Runs sonner's `onDismiss`.
+	 *
+	 * @param {string|number} [id]
+	 */
 	const dismiss = (id) => {
-		const targets = untracked(() => store.items.filter((item) => !item.removed && (id === undefined || item.id === id)));
+		const targets = id === undefined ? live() : live().filter((item) => item.id === id);
 
 		batch(() => targets.forEach((item) => {
-			clearTimer(item.id);
-			item.removed = true;
+			manual.add(item.id);
 
 			if(item.onDismiss) {
 				item.onDismiss(item);
 			}
 
-			setTimeout(() => {
-				const current = find(item.id);
-
-				// Re-shown under the same id during its exit: keep it.
-				if(current && current.removed) {
-					scheduled.delete(item.id);
-					controller.dismiss(item.id);
-				}
-			}, config.exitMs);
+			controller.dismiss(item.id);
 		}));
-	};
-
-	const durationOf = (item) => {
-		if(item.duration !== undefined && item.duration !== null) {
-			return item.duration;
-		}
-
-		return item.variant === "loading" ? Infinity : config.duration;
-	};
-
-	const schedule = (item) => {
-		const remaining = durationOf(item);
-
-		clearTimer(item.id);
-
-		// Infinity (or a non-positive duration) means sticky: no countdown.
-		if(!Number.isFinite(remaining) || remaining <= 0) {
-			return;
-		}
-
-		const timer = { remaining, started: now(), handle: null };
-
-		timer.start = () => {
-			timer.started = now();
-			timer.handle = setTimeout(() => {
-				timers.delete(item.id);
-
-				const current = find(item.id);
-
-				if(current && current.onAutoClose) {
-					current.onAutoClose(current);
-				}
-
-				dismiss(item.id);
-			}, timer.remaining);
-		};
-
-		timers.set(item.id, timer);
-
-		if(!untracked(() => status.paused)) {
-			timer.start();
-		}
 	};
 
 	const enforceLimit = () => {
-		const live = untracked(() => store.items.filter((item) => !item.removed));
+		const current = live();
 
-		live.slice(0, Math.max(0, live.length - config.limit)).forEach((item) => dismiss(item.id));
+		current.slice(0, Math.max(0, current.length - config.limit)).forEach((item) => dismiss(item.id));
 	};
-
-	// Every toast that appears — ours, or one qrp pushed from the bus — gets a
-	// countdown once.
-	effect(() => {
-		const fresh = store.items.filter((item) => !scheduled.has(item.id));
-
-		untracked(() => fresh.forEach((item) => {
-			scheduled.add(item.id);
-			schedule(item);
-		}));
-
-		if(fresh.length > 0) {
-			untracked(enforceLimit);
-		}
-	});
 
 	/**
 	 * Show a toast, or update the live one with the same `id`.
@@ -151,52 +85,53 @@ export const toastLayer = (controller, options = {}) => {
 	const add = (data) => {
 		const existing = data.id !== undefined ? find(data.id) : null;
 
-		if(existing) {
-			batch(() => {
-				Object.assign(existing, data, { removed: false });
-			});
-			schedule(existing);
-
-			return existing.id;
-		}
-
-		counter += 1;
+		counter += existing ? 0 : 1;
 
 		const id = data.id !== undefined ? data.id : `toast-${counter}`;
+		const variant = data.variant || (existing ? existing.variant : "default");
+		const meta = Object.assign({}, data, { id, layered: true, duration: durationOf(Object.assign({}, data, { variant })) });
 
-		// qrp items are { id, variant, title, content }; `content` mirrors the
-		// description so qrp's own toast component would still show it.
-		store.items = [...untracked(() => store.items), Object.assign({ variant: "default", content: data.description || "" }, data, {
-			id,
-			layered: true,
-			removed: false,
-			createdAt: now()
-		})];
+		// qrp titles an untitled toast with its variant name ("loading"); sonner
+		// shows nothing, so renderers check `untitled`.
+		if(!existing || "title" in data) {
+			meta.untitled = data.title === undefined || data.title === null || data.title === "";
+		}
+
+		delete meta.variant;
+		manual.delete(id);
+		closed.delete(id);
+
+		// `content` mirrors the description, so qrp's stock component shows it too.
+		controller.push(variant, data.description !== undefined ? data.description : (existing ? existing.content : ""), meta);
+		untracked(enforceLimit);
 
 		return id;
 	};
 
-	/** Freeze every countdown (pointer over the stack, tab hidden). */
-	const pause = () => {
-		if(untracked(() => status.paused)) {
-			return;
-		}
+	// Toasts qrp pushed from the bus get this layer's default duration once, and
+	// a toast that leaves without dismiss() (its countdown ran out) fires
+	// sonner's onAutoClose.
+	effect(() => {
+		const current = store.items;
 
-		status.paused = true;
-		timers.forEach((timer) => {
-			clearTimeout(timer.handle);
-			timer.remaining -= now() - timer.started;
+		// Track each item's exit flag: qrp flips it in place when a countdown ends.
+		current.forEach((item) => item.removed);
+
+		untracked(() => {
+			current.filter((item) => !item.layered && !timed.has(item.id)).forEach((item) => {
+				timed.add(item.id);
+				controller.update(item.id, { duration: config.duration });
+			});
+
+			current.filter((item) => item.removed && !manual.has(item.id) && !closed.has(item.id)).forEach((item) => {
+				closed.add(item.id);
+
+				if(item.onAutoClose) {
+					item.onAutoClose(item);
+				}
+			});
 		});
-	};
-
-	const resume = () => {
-		if(!untracked(() => status.paused)) {
-			return;
-		}
-
-		status.paused = false;
-		timers.forEach((timer) => timer.start());
-	};
+	});
 
 	return {
 		controller,
@@ -204,8 +139,10 @@ export const toastLayer = (controller, options = {}) => {
 		add,
 		update: (id, data) => add(Object.assign({}, data, { id })),
 		dismiss,
-		pause,
-		resume,
+		/** Freeze every countdown (pointer over the stack, tab hidden). */
+		pause: () => controller.pause(),
+		resume: () => controller.resume(),
+		/** `{ duration, limit }` — the exit time is the controller's `exitMs`. */
 		configure: (next) => Object.assign(config, next),
 		config
 	};
@@ -246,7 +183,7 @@ export const toastApi = (layer) => {
 				return;
 			}
 
-			layer.update(id, { variant, title: resolve(message, value), duration: undefined });
+			layer.update(id, { variant, title: resolve(message, value) });
 		};
 
 		Promise.resolve(pending)

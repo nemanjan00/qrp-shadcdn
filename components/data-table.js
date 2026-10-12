@@ -10,7 +10,8 @@
  * Both run over the SAME `sort` / `filter` / `page` state objects, so the grid's
  * counts and the rendered rows always agree. The UI is our own components
  * (Checkbox, Input, DropdownMenu, Select, Button) skinned onto `table()` through
- * its `classes` hooks.
+ * its `classes` / `attrs` hooks. The grid is the table's `view`, so there is a
+ * single sort/filter/page pipeline.
  *
  *   DataTable({
  *     data: () => store.payments,
@@ -36,7 +37,7 @@
  * https://ui.shadcn.com/docs/components/data-table
  */
 
-import { el, state, effect, untracked, when, batch } from "@nemanjan00/qrp";
+import { el, state, effect, untracked, when } from "@nemanjan00/qrp";
 import { table as qrpTable } from "@nemanjan00/qrp/table";
 import { dataGrid } from "@nemanjan00/qrp/datagrid";
 import { parseArgs, pick, cn, read } from "../utils/index.js";
@@ -58,7 +59,7 @@ const CLASSES = {
 	table: "w-full caption-bottom text-sm",
 	thead: "[&_tr]:border-b",
 	tbody: "[&_tr:last-child]:border-0",
-	row: "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50",
+	row: "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
 	th: "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
 	td: "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]"
 };
@@ -139,8 +140,8 @@ export const useDataTable = (options) => {
 
 						return grid.someSelected() ? "indeterminate" : false;
 					},
-					// One update, not one per row (datagrid writes ids individually).
-					onCheckedChange: () => batch(() => grid.toggleAll())
+					// qrp batches the multi-row write: one update, not one per row.
+					onCheckedChange: () => grid.toggleAll()
 				})),
 				// The checkbox binds to the selection itself; untracked keeps the
 				// cell from rebuilding (and losing focus) on every toggle.
@@ -220,22 +221,30 @@ export const DataTableView = (...args) => {
 	const dt = own.table;
 	const grid = dt.grid;
 
+	// The grid IS the table's view: one sort/filter/page pipeline, so the
+	// toolbar, the row count and the rendered rows can never disagree.
 	const node = qrpTable({
-		rows: dt.rows,
+		view: grid,
 		key: dt.key,
 		fields: dt.fields,
-		sort: dt.sort,
-		page: dt.page,
-		filter: dt.filter,
-		filterFn: dt.filterFn,
 		class: CLASSES.table,
 		classes: {
 			thead: CLASSES.thead,
 			headRow: CLASSES.row,
 			th: CLASSES.th,
 			tbody: CLASSES.tbody,
-			tr: (item) => cn(CLASSES.row, grid.isSelected(item) ? "bg-muted" : null),
+			tr: CLASSES.row,
 			td: CLASSES.td
+		},
+		// shadcn's TableRow styles data-state="selected"; the slots match Table's.
+		attrs: {
+			tr: (item) => {
+				const selected = grid.isSelected(item);
+
+				return { "data-slot": "table-row", "data-state": selected ? "selected" : null, "aria-selected": selected ? "true" : null };
+			},
+			th: () => ({ "data-slot": "table-head" }),
+			td: () => ({ "data-slot": "table-cell" })
 		},
 		// The header button draws the arrow; no extra indicator.
 		sortIndicator: () => null

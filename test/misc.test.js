@@ -5,6 +5,9 @@ import { state, mount } from "@nemanjan00/qrp";
 
 import { form as qrpForm, getInput } from "@nemanjan00/qrp/forms";
 import { dataGrid } from "@nemanjan00/qrp/datagrid";
+import { createToasts } from "@nemanjan00/qrp/toasts";
+import { emitter } from "@nemanjan00/qrp/events";
+import { toastLayer, toastApi } from "../utils/toaster.js";
 import {
 	Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbEllipsis,
 	Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext, PaginationEllipsis, PaginationFor,
@@ -14,7 +17,7 @@ import {
 	InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, InputGroupText, InputGroupTextarea,
 	Field, FieldLabel, FieldDescription, FieldError, FieldGroup, FieldSet, FieldLegend, FieldSeparator, FieldContent, FieldTitle, Input,
 	useForm, Form, FormField, FormFields, FormItem, FormLabel, FormControl, FormDescription, FormMessage, registerShadcnInputs,
-	Toaster, toast, sonner, notify, LegacyToaster, useToast, legacyToast, ToastAction, useIsMobile
+	Toaster, sonner, notify, LegacyToaster, useToast, legacyToast, ToastAction, useIsMobile
 } from "../index.js";
 
 const tick = (ms = 5) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -252,10 +255,12 @@ test("Sonner: toast() options, notify from qrp bus, promise updates in place, ex
 
 	document.body.append(host);
 
-	const mounted = mount(host, () => Toaster({ closeButton: true, richColors: true }));
+	// A layer like the default one (global bus, so notify reaches it) but with a
+	// short exit, so the test doesn't wait out the 400ms transition.
+	const layer = toastLayer(createToasts({ timeout: 0, exitMs: 10 }), { duration: 4000 });
+	const toast = toastApi(layer);
+	const mounted = mount(host, () => Toaster({ closeButton: true, richColors: true, toaster: layer }));
 	const list = () => [...host.querySelectorAll("[data-sonner-toast]")];
-
-	sonner.configure({ exitMs: 10 });
 
 	const id = toast("Event has been created", { description: "Sunday", action: { label: "Undo", onClick: () => {} } });
 
@@ -293,9 +298,9 @@ test("Sonner: toast() options, notify from qrp bus, promise updates in place, ex
 	await tick(30);
 	assert.equal(list().length, 0);
 	assert.ok(id && promised);
+	assert.ok(sonner.controller.store, "the default layer sits on a qrp controller");
 	mounted.dispose();
 	host.remove();
-	sonner.configure({ exitMs: 400 });
 });
 
 test("Sonner: auto-dismiss honours duration and pauses while hovered", async () => {
@@ -303,9 +308,10 @@ test("Sonner: auto-dismiss honours duration and pauses while hovered", async () 
 
 	document.body.append(host);
 
-	const mounted = mount(host, () => Toaster());
+	const layer = toastLayer(createToasts({ timeout: 0, exitMs: 5, bus: emitter() }));
+	const toast = toastApi(layer);
+	const mounted = mount(host, () => Toaster({ toaster: layer }));
 
-	sonner.configure({ exitMs: 5 });
 	toast("Short", { duration: 30 });
 
 	const stack = host.querySelector("[data-sonner-toaster]");
@@ -318,7 +324,32 @@ test("Sonner: auto-dismiss honours duration and pauses while hovered", async () 
 	assert.equal(host.querySelectorAll("[data-sonner-toast]").length, 0);
 	mounted.dispose();
 	host.remove();
-	sonner.configure({ exitMs: 400 });
+});
+
+test("Sonner: untitled toasts show no title; onAutoClose / onDismiss fire; limit drops the oldest", async () => {
+	const layer = toastLayer(createToasts({ timeout: 0, exitMs: 5, bus: emitter() }), { limit: 2 });
+	const toast = toastApi(layer);
+	const host = document.createElement("div");
+	const events = [];
+
+	document.body.append(host);
+
+	const mounted = mount(host, () => Toaster({ toaster: layer }));
+
+	toast.loading(undefined, { description: "Working" });
+	assert.equal(host.querySelector("[data-title]").textContent, "", "no 'loading' placeholder title");
+
+	toast("Auto", { duration: 10, onAutoClose: () => events.push("auto") });
+	toast("Manual", { onDismiss: () => events.push("dismiss") });
+	assert.equal(toast.getToasts().length, 2, "limit 2: the oldest left");
+
+	await tick(30);
+	toast.dismiss();
+	assert.deepEqual(events, ["auto", "dismiss"]);
+	await tick(20);
+	assert.equal(host.querySelectorAll("[data-sonner-toast]").length, 0);
+	mounted.dispose();
+	host.remove();
 });
 
 test("Legacy toast: useToast(), limit 1, destructive variant, action dismisses", async () => {

@@ -27,14 +27,20 @@ const VISIBLE_TOASTS = 3;
 const OFFSET = "32px";
 const SCALE_STEP = 0.05;
 
+// The toast's exit transition (duration-400 in TOAST below).
+const EXIT_MS = 400;
+
 /**
  * The default store: a qrp toasts controller on the global event bus (so
- * `notify.success("…")` from any qrp code shows here too), with no qrp timeout
- * — the sonner layer runs per-toast countdowns, pausing and exits.
+ * `notify.success("…")` from any qrp code shows here too). qrp runs the
+ * countdowns, pausing and the exit phase; the layer sets sonner's durations.
  */
-export const sonner = toastLayer(createToasts({ timeout: 0 }), { duration: 4000, exitMs: 400 });
+export const sonner = toastLayer(createToasts({ timeout: 0, exitMs: EXIT_MS }), { duration: 4000 });
 
 export const toast = toastApi(sonner);
+
+/** Build your own stack (private bus, other exit time) for `Toaster({ toaster })`. */
+export { toastLayer, toastApi };
 
 /**
  * qrp's `notify` and global `bus`, re-exported from the bundle. On the CDN the
@@ -52,7 +58,7 @@ const QRP_TITLES = ["Success", "Error", "Info", "Warning"];
 /** What to show for a store item: ours carry title/description; bus ones title/content. */
 const textOf = (item) => {
 	if(item.layered) {
-		return { title: item.title, description: item.description };
+		return { title: item.untitled ? null : item.title, description: item.description };
 	}
 
 	return { title: item.content, description: QRP_TITLES.includes(item.title) ? null : item.title };
@@ -189,7 +195,8 @@ const body = (engine, item, options) => {
  * @param {string} [props.offset] distance from the viewport edge (default "32px")
  * @param {("light"|"dark"|"system")} [props.theme] "dark" forces dark colors
  * @param {object} [props.icons] `{ success, info, warning, error, loading }` overrides
- * @param {object} [props.toaster] a toastLayer() (default: the one toast() and notify use)
+ * @param {object} [props.toaster] a toastLayer() (default: the one toast() and notify use);
+ *   its qrp controller's `exitMs` should match the 400ms exit transition
  * @returns {HTMLElement}
  */
 export const Toaster = (...args) => {

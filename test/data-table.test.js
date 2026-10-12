@@ -82,10 +82,13 @@ test("select-all goes indeterminate on a partial selection; rows highlight; coun
 	const all = node.querySelector("thead [role=checkbox]");
 	const firstRow = node.querySelector("table tbody tr");
 
+	assert.equal(firstRow.hasAttribute("data-state"), false);
 	firstRow.querySelector("[role=checkbox]").click();
 	assert.equal(dt.grid.selectedIds().length, 1);
 	assert.equal(all.getAttribute("data-state"), "indeterminate");
-	assert.ok(firstRow.className.includes("bg-muted"));
+	assert.equal(firstRow.getAttribute("data-state"), "selected", "TableRow's data-[state=selected] styling");
+	assert.equal(firstRow.getAttribute("aria-selected"), "true");
+	assert.equal(firstRow.dataset.slot, "table-row");
 	assert.ok(node.textContent.includes("1 of 5 row(s) selected."));
 
 	all.click();
@@ -94,7 +97,8 @@ test("select-all goes indeterminate on a partial selection; rows highlight; coun
 
 	all.click();
 	assert.equal(dt.grid.selectedIds().length, 0);
-	assert.deepEqual(seen, [1, 5, 0]);
+	assert.equal(firstRow.hasAttribute("data-state"), false, "deselected rows drop the attribute");
+	assert.deepEqual(seen, [1, 5, 0], "one selection change per select-all, not one per row");
 	node.remove();
 });
 

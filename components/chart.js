@@ -22,22 +22,21 @@
  * `data` may be an array or a thunk — the chart is live. ChartSparkline wraps
  * qrp's `spark` for KPI cards.
  *
- * Built on qrp: `scale.linear`/`scale.ticks` for geometry, `derive` + keyed
- * `list()` for the marks (a data change rebinds attributes, it doesn't rebuild
- * the SVG), `timeseries.downsample` (LTTB) for lines denser than the pixels,
- * `format.num` for default labels, `spark` for sparklines. `spark` itself is
- * single-series with per-series extents, so the cartesian charts follow the
- * multi-series recipe in spark's docs instead of calling it.
+ * Built on qrp: `spark` draws every line/area series (one responsive spark per
+ * series on a shared y domain, `stack` baselines, `curve` types), `project()`
+ * gives the bar/dot/tooltip geometry from the same options, `scale.nice` the
+ * y ticks, `derive` + keyed `list()` the bars and dots (a data change moves
+ * marks, it doesn't rebuild the SVG), `timeseries.downsample` (LTTB) thins
+ * lines denser than the pixels, `format.num` the default labels.
  * https://ui.shadcn.com/docs/components/chart
  */
 
-import { el, state, derive, list, when, untracked, onDispose } from "@nemanjan00/qrp";
-import { linear, ticks } from "@nemanjan00/qrp/scale";
-import { spark } from "@nemanjan00/qrp/spark";
+import { el, state, derive, list, when, effect, untracked, onDispose } from "@nemanjan00/qrp";
+import { linear, ticks, nice } from "@nemanjan00/qrp/scale";
+import { spark, project } from "@nemanjan00/qrp/spark";
 import { downsample } from "@nemanjan00/qrp/timeseries";
 import { num } from "@nemanjan00/qrp/format";
 import { parseArgs, pick, cn, uid, read } from "../utils/index.js";
-import { curve, areaPath } from "../utils/curves.js";
 
 const THEMES = { light: "", dark: ".dark" };
 const INITIAL = { width: 320, height: 200 };
@@ -46,9 +45,14 @@ const X_AXIS_HEIGHT = 30;
 const Y_AXIS_WIDTH = 60;
 const TICK_SIZE = 6;
 const CHAR_WIDTH = 6.5;
-const CATEGORY_GAP = 0.1;
+// Fraction of each category band left empty around its bars (spark's `gap`).
+const CATEGORY_GAP = 0.2;
+// px between grouped bars (recharts' barGap); spark packs group slots edge to edge.
 const BAR_GAP = 4;
 const TOOLTIP_OFFSET = 10;
+// Line/area sparks draw in this viewBox and stretch to the plot box
+// (`responsive`: strokes keep their width), so a resize never rebuilds them.
+const NOMINAL = 1000;
 
 // --- descriptors -----------------------------------------------------------
 // Chart parts are plain descriptions read by the chart, like recharts children.
@@ -164,28 +168,19 @@ export const ChartContainer = (...args) => {
 
 // --- geometry ---------------------------------------------------------------
 
-/** A "nice" step (1, 2, 2.5, 5 × 10^n) so ticks land on round numbers. */
-const niceStep = (span, count) => {
-	const raw = span / Math.max(1, count);
-	const power = 10 ** Math.floor(Math.log10(raw || 1));
-	const unit = raw / power;
-	const nice = [1, 2, 2.5, 5, 10].find((candidate) => unit <= candidate);
+/** The y axis: a forced domain, or the data's range (always incl. 0) rounded out by scale.nice. */
+const yAxisFor = (values, axis) => {
+	const count = (axis && axis.tickCount) || 5;
 
-	return nice * power;
-};
-
-/** Domain stretched to whole steps, plus the tick values (via scale.ticks). */
-const niceDomain = (lo, hi, count, forced) => {
-	if(forced) {
-		return { domain: forced, ticks: ticks(forced, count) };
+	if(axis && axis.domain) {
+		return { domain: axis.domain, ticks: ticks(axis.domain, count) };
 	}
 
-	const low = Math.min(0, lo);
-	const high = Math.max(0, hi);
-	const step = niceStep(high - low || 1, count);
-	const domain = [Math.floor(low / step) * step, Math.ceil(high / step) * step || step];
+	const low = Math.min(0, ...values);
+	const high = Math.max(0, ...values);
+	const range = nice([low, high > low ? high : low + 1], count);
 
-	return { domain, ticks: ticks(domain, Math.round((domain[1] - domain[0]) / step)) };
+	return { domain: range.domain, ticks: range.ticks };
 };
 
 /** Bar outline with per-corner radii `[tl, tr, br, bl]`. */
@@ -217,7 +212,9 @@ const valueOf = (row, key) => {
 
 /**
  * Everything the marks bind to, recomputed (via derive) when data or size
- * change: plot box, scales, ticks, per-series points and bars.
+ * change: plot box, the shared y axis, and per-series geometry from qrp spark's
+ * `project()` — the same points the line/area sparks draw, so dots, the cursor
+ * and the tooltip line up with the paths.
  */
 const computeLayout = (kind, rows, size, parts, margin) => {
 	const x = parts.xaxis ? parts.xaxis.props : null;
@@ -231,6 +228,8 @@ const computeLayout = (kind, rows, size, parts, margin) => {
 		bottom: size.height - margin.bottom - (showX ? (x.height || X_AXIS_HEIGHT) : 0)
 	};
 	const n = rows.length;
+	const width = Math.max(0, plot.right - plot.left);
+	const height = Math.max(0, plot.bottom - plot.top);
 
 	// Stack offsets: series sharing a stackId sit on top of each other.
 	const stackTops = {};
@@ -246,39 +245,55 @@ const computeLayout = (kind, rows, size, parts, margin) => {
 		return { series, bases, tops };
 	});
 
-	const all = stacked.flatMap((s) => s.tops.concat(s.bases));
-	const scaleY = niceDomain(Math.min(0, ...all), Math.max(0, ...all), (y && y.tickCount) || 5, y && y.domain);
-	const toY = linear(scaleY.domain, [plot.bottom, plot.top]);
-	const width = Math.max(0, plot.right - plot.left);
+	const axisY = yAxisFor(stacked.flatMap((s) => s.tops.concat(s.bases)), y);
+	const toY = linear(axisY.domain, [plot.bottom, plot.top]);
 	const band = n > 0 ? width / n : width;
 	const isBand = kind === "bar";
 	const center = (i) => (isBand ? plot.left + band * (i + 0.5) : plot.left + (n > 1 ? (width * i) / (n - 1) : width / 2));
 
-	// Bar slots: each unstacked bar gets one, each stack shares one.
+	// Bar slots: each unstacked bar gets one, each stack shares one (spark `group`).
 	const slotKeys = [...new Set(parts.series.map((series, i) => (series.props.stackId === undefined ? `#${i}` : `s:${series.props.stackId}`)))];
-	const inner = band * (1 - CATEGORY_GAP * 2);
-	const slotWidth = slotKeys.length > 0 ? Math.max(1, (inner - BAR_GAP * (slotKeys.length - 1)) / slotKeys.length) : inner;
 
 	const geometry = stacked.map((s, seriesIndex) => {
-		const slot = slotKeys.indexOf(s.series.props.stackId === undefined ? `#${seriesIndex}` : `s:${s.series.props.stackId}`);
-		const maxBar = s.series.props.maxBarSize;
-		const barWidth = maxBar ? Math.min(maxBar, slotWidth) : slotWidth;
-
-		return {
-			series: s.series,
-			points: s.tops.map((top, i) => [center(i), toY(top)]),
-			base: s.bases.map((value, i) => [center(i), toY(value)]),
-			bars: s.tops.map((top, i) => {
-				const left = plot.left + band * i + band * CATEGORY_GAP + slot * (slotWidth + BAR_GAP) + (slotWidth - barWidth) / 2;
-				const yTop = toY(Math.max(top, s.bases[i]));
-				const yBottom = toY(Math.min(top, s.bases[i]));
-
-				return { x: left, y: yTop, width: barWidth, height: Math.max(0, yBottom - yTop) };
-			})
+		const stackId = s.series.props.stackId;
+		const shared = {
+			y: (row) => valueOf(row, s.series.props.dataKey),
+			stack: stackId === undefined ? undefined : s.bases,
+			base: 0,
+			yDomain: axisY.domain,
+			width,
+			height,
+			padding: 0
 		};
+
+		if(isBand) {
+			const slot = slotKeys.indexOf(stackId === undefined ? `#${seriesIndex}` : `s:${stackId}`);
+			const maxBar = s.series.props.maxBarSize;
+			const slots = slotKeys.length;
+			const bars = project(rows, Object.assign({ kind: "bar", group: [slot, slots], gap: CATEGORY_GAP }, shared)).map((p) => {
+				// Re-split spark's slot row with recharts' gap between the bars.
+				const groupLeft = p.left - slot * p.width;
+				const slotWidth = Math.max(1, (p.width * slots - BAR_GAP * (slots - 1)) / slots);
+				const barWidth = maxBar ? Math.min(maxBar, slotWidth) : slotWidth;
+
+				return {
+					x: plot.left + groupLeft + slot * (slotWidth + BAR_GAP) + (slotWidth - barWidth) / 2,
+					y: plot.top + Math.min(p.y, p.y0),
+					width: barWidth,
+					height: Math.abs(p.y0 - p.y)
+				};
+			});
+
+			return { series: s.series, bases: s.bases, bars, points: bars.map((bar) => [bar.x + bar.width / 2, bar.y]) };
+		}
+
+		const points = project(rows, Object.assign({ kind, xDomain: [0, Math.max(0, n - 1)] }, shared))
+			.map((p) => [plot.left + p.x, plot.top + p.y]);
+
+		return { series: s.series, bases: s.bases, points, bars: [] };
 	});
 
-	return { plot, band, center, toY, yTicks: scaleY.ticks, geometry, n, isBand };
+	return { plot, band, center, toY, yDomain: axisY.domain, yTicks: axisY.ticks, geometry, n, isBand };
 };
 
 /** Category labels that fit: skip one that would collide with the previous. */
@@ -388,26 +403,82 @@ const collect = (children) => children.reduce((acc, child) => {
 	return acc;
 }, { series: [] });
 
-/** Line/area points, LTTB-downsampled when denser than one per 2px. */
-const thinned = (points, width, stacked) => {
+/** The rows a line/area spark draws, LTTB-downsampled when denser than one per 2px. */
+const thinned = (rows, key, width, stacked) => {
+	const points = rows.map((row, i) => ({ x: i, y: valueOf(row, key) }));
 	const budget = Math.max(3, Math.floor(width / 2));
 
 	if(stacked || points.length <= budget) {
 		return points;
 	}
 
-	return downsample(points.map(([px, py]) => ({ x: px, y: py })), budget).map((p) => [p.x, p.y]);
+	return downsample(points, budget);
 };
 
 const dotProps = (spec, color) => Object.assign({ r: 3, fill: "var(--background)", stroke: color, "stroke-width": 2 }, typeof spec === "object" ? spec : {});
 
-const seriesMarks = (layout, kind, entry, index) => {
+/**
+ * A line/area series drawn by qrp's spark: a responsive spark per series
+ * stretched over the plot box, sharing the chart's y domain and the stack
+ * baseline. Its paths update in place when the data changes.
+ */
+const sparkSeries = (layout, rows, kind, entry, index) => {
+	const series = entry.props;
+	const color = seriesColor(entry);
+	const stacked = series.stackId !== undefined;
+	const plot = () => layout.value.plot;
+	const node = spark(() => thinned(rows(), series.dataKey, plot().right - plot().left, stacked), {
+		kind,
+		x: "x",
+		y: "y",
+		xDomain: () => [0, Math.max(0, layout.value.n - 1)],
+		yDomain: () => layout.value.yDomain,
+		base: 0,
+		stack: stacked ? (d) => layout.value.geometry[index].bases[d.x] || 0 : undefined,
+		curve: series.type || "linear",
+		responsive: true,
+		width: NOMINAL,
+		height: NOMINAL,
+		padding: 0,
+		stroke: series.stroke || color,
+		fill: kind === "area" ? series.fill || color : "none",
+		strokeWidth: series.strokeWidth || (kind === "area" ? 1 : 2)
+	});
+
+	// Place the spark on the plot box; let a stroke on the edge overflow it.
+	effect(() => {
+		const box = plot();
+
+		node.setAttribute("x", String(box.left));
+		node.setAttribute("y", String(box.top));
+		node.setAttribute("width", String(Math.max(0, box.right - box.left)));
+		node.setAttribute("height", String(Math.max(0, box.bottom - box.top)));
+	});
+	node.setAttribute("overflow", "visible");
+
+	// spark's own mark styling, adjusted to recharts' (styles beat attributes).
+	const paths = [...node.querySelectorAll("path")];
+	const line = paths[paths.length - 1];
+
+	if(kind === "area") {
+		paths[0].style.fillOpacity = String(series.fillOpacity === undefined ? 0.6 : series.fillOpacity);
+	}
+
+	if(series.strokeDasharray) {
+		line.style.strokeDasharray = String(series.strokeDasharray);
+	}
+
+	return node;
+};
+
+const seriesMarks = (layout, rows, kind, entry, index) => {
 	const series = entry.props;
 	const color = seriesColor(entry);
 	const geometry = () => layout.value.geometry[index];
-	const type = series.type || "linear";
 
 	if(kind === "bar") {
+		// Keyed paths (not spark's rebuilt rects): a data change moves the bars
+		// in place, and recharts' per-corner radius ([4, 4, 0, 0]) still works.
 		return el("g", { "data-slot": "chart-bar", "data-key": series.dataKey },
 			list(() => geometry().bars.map((_, i) => i), (i) => i, (i) => el("path", {
 				d: () => {
@@ -420,27 +491,7 @@ const seriesMarks = (layout, kind, entry, index) => {
 			})));
 	}
 
-	const stacked = series.stackId !== undefined;
-	const width = () => layout.value.plot.right - layout.value.plot.left;
-	const marks = [];
-
-	if(kind === "area") {
-		marks.push(el("path", {
-			d: () => areaPath(thinned(geometry().points, width(), stacked), thinned(geometry().base, width(), stacked), type),
-			fill: series.fill || color,
-			"fill-opacity": series.fillOpacity === undefined ? 0.6 : series.fillOpacity,
-			stroke: "none"
-		}));
-	}
-
-	marks.push(el("path", {
-		d: () => curve(thinned(geometry().points, width(), stacked), type),
-		fill: "none",
-		stroke: series.stroke || color,
-		"stroke-width": series.strokeWidth || (kind === "area" ? 1 : 2),
-		"stroke-dasharray": series.strokeDasharray
-	}));
-
+	const marks = [sparkSeries(layout, rows, kind, entry, index)];
 	const showDots = kind === "line" ? series.dot !== false : Boolean(series.dot);
 
 	if(showDots) {
@@ -586,7 +637,7 @@ const makeChart = (kind) => (...args) => {
 			}
 		},
 		onblur: () => { hover.index = -1; }
-	}, cursor, grid, xAxis, yAxis, ...parts.series.map((entry, index) => seriesMarks(layout, entry.kind, entry, index)), activeDots);
+	}, cursor, grid, xAxis, yAxis, ...parts.series.map((entry, index) => seriesMarks(layout, rows, entry.kind, entry, index)), activeDots);
 
 	const tooltipNode = tooltip ? el("div", {
 		"data-slot": "chart-tooltip",

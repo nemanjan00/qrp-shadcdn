@@ -15,8 +15,8 @@
  * https://ui.shadcn.com/docs/components/toast
  */
 
-import { el, list, effect, untracked } from "@nemanjan00/qrp";
-import { part, parseArgs, pick, cn, read, variants, fragmentOf, animateOut } from "../utils/index.js";
+import { el, list, untracked } from "@nemanjan00/qrp";
+import { part, parseArgs, pick, cn, read, variants, fragmentOf } from "../utils/index.js";
 import { createToasts } from "@nemanjan00/qrp/toasts";
 import { emitter } from "@nemanjan00/qrp/events";
 import { toastLayer } from "../utils/toaster.js";
@@ -24,17 +24,18 @@ import { XIcon } from "../icons/index.js";
 
 const TOAST_LIMIT = 1;
 const TOAST_DURATION = 5000;
-// Upper bound only: each toast leaves on its own animationend (see renderToast).
-const EXIT_MS = 1000;
+// The exit animation (tw-animate's default 150ms) plus a frame of slack; the
+// closed toast holds its last frame until qrp removes it.
+const EXIT_MS = 200;
 
 /**
  * The store behind `useToast()` / `legacyToast()`: a qrp toasts controller on a
  * PRIVATE emitter — `notify.*` on the global bus belongs to the Sonner stack.
+ * qrp runs the countdown and the exit phase.
  */
-export const legacyToaster = toastLayer(createToasts({ timeout: 0, bus: emitter() }), {
+export const legacyToaster = toastLayer(createToasts({ timeout: 0, exitMs: EXIT_MS, bus: emitter() }), {
 	limit: TOAST_LIMIT,
-	duration: TOAST_DURATION,
-	exitMs: EXIT_MS
+	duration: TOAST_DURATION
 });
 
 export const ToastProvider = (...args) => fragmentOf(parseArgs(args).children);
@@ -132,23 +133,11 @@ export const LegacyToaster = (...args) => {
 			}
 		},
 		el("div", { class: "grid gap-1" },
-			() => (item.title ? ToastTitle(read(item.title)) : null),
+			() => (item.title && !item.untitled ? ToastTitle(read(item.title)) : null),
 			() => (item.description ? ToastDescription(read(item.description)) : null)
 		),
 		() => item.action || null,
 		ToastClose());
-
-		// Leave the moment the exit animation ends: waiting a fixed time longer
-		// would show the toast snap back to full opacity in between.
-		effect(() => {
-			if(item.removed) {
-				untracked(() => animateOut(node).then(() => {
-					if(item.removed) {
-						engine.controller.dismiss(item.id);
-					}
-				}));
-			}
-		});
 
 		return node;
 	};

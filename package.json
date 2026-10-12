@@ -63,12 +63,12 @@
 		"access": "public"
 	},
 	"peerDependencies": {
-		"@nemanjan00/qrp": "^0.12.1"
+		"@nemanjan00/qrp": "^0.12.2"
 	},
 	"devDependencies": {
 		"@babel/core": "^7.29.7",
 		"@babel/eslint-parser": "^7.29.9",
-		"@nemanjan00/qrp": "^0.12.1",
+		"@nemanjan00/qrp": "^0.12.2",
 		"@tailwindcss/cli": "^4.3.3",
 		"esbuild": "^0.28.2",
 		"eslint": "^8.57.1",

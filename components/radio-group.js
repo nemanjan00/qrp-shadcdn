@@ -11,11 +11,15 @@
  * https://ui.shadcn.com/docs/components/radio-group
  */
 
-import { el, effect, untracked, onDispose } from "@nemanjan00/qrp";
-import { parseArgs, pick, cn, controllable, owned, watchTree } from "../utils/index.js";
-import { ownerOf, isDisabled, roveTarget, bound } from "../utils/roving.js";
+import { el } from "@nemanjan00/qrp";
+import { createContext } from "@nemanjan00/qrp/context";
+import { parseArgs, pick, cn, controllable } from "../utils/index.js";
+import { members, joinGroup, tabStop, isDisabled, roveTarget, bound } from "../utils/roving.js";
 import { CircleIcon } from "../icons/index.js";
 import { Label } from "./label.js";
+
+/** The group controller items read: value, disabled, item set. */
+const RadioGroupContext = createContext(null);
 
 /**
  * RadioGroup root.
@@ -43,6 +47,19 @@ export const RadioGroup = (...args) => {
 		disabled: () => !value.get()
 	}) : null;
 
+	const items = members();
+
+	const group = {
+		items,
+		disabled: Boolean(own.disabled),
+		value: () => value.get(),
+		select: (item) => {
+			if(item && !isDisabled(item)) {
+				value.set(item.getAttribute("data-value"));
+			}
+		}
+	};
+
 	const root = el("div", Object.assign({
 		"data-slot": "radio-group",
 		role: "radiogroup",
@@ -53,50 +70,10 @@ export const RadioGroup = (...args) => {
 		class: cn("grid gap-3", own.class)
 	}), ...children, input);
 
-	const items = () => owned(root, "radio-group-item", "radio-group");
-
-	const sync = (current) => {
-		const all = items();
-
-		all.forEach((item) => {
-			const on = item.getAttribute("data-value") === current;
-			const indicator = item.querySelector("[data-slot=radio-group-indicator]");
-
-			if(own.disabled) {
-				item.disabled = true;
-				item.setAttribute("data-disabled", "");
-			}
-
-			item.setAttribute("aria-checked", String(on));
-			item.setAttribute("data-state", on ? "checked" : "unchecked");
-			item.tabIndex = -1;
-
-			if(indicator) {
-				indicator.setAttribute("data-state", on ? "checked" : "unchecked");
-				indicator.hidden = !on;
-			}
-		});
-
-		const enabled = all.filter((item) => !isDisabled(item));
-		const focusable = enabled.find((item) => item.getAttribute("data-state") === "checked") || enabled[0];
-
-		if(focusable) {
-			focusable.tabIndex = 0;
-		}
-	};
-
-	root.addEventListener("click", (event) => {
-		const item = event.target.closest("[data-slot=radio-group-item]");
-
-		if(item && ownerOf(item, "radio-group") === root && !isDisabled(item)) {
-			value.set(item.getAttribute("data-value"));
-		}
-	});
-
 	root.addEventListener("keydown", (event) => {
 		const item = event.target.closest("[data-slot=radio-group-item]");
 
-		if(!item || ownerOf(item, "radio-group") !== root) {
+		if(!item || !items.has(item)) {
 			return;
 		}
 
@@ -106,43 +83,69 @@ export const RadioGroup = (...args) => {
 			return;
 		}
 
-		const target = roveTarget(event, items().filter((node) => !isDisabled(node)), { orientation: own.orientation, loop: own.loop !== false });
+		const target = roveTarget(event, items.list().filter((node) => !isDisabled(node)), { orientation: own.orientation, loop: own.loop !== false });
 
 		if(target) {
 			event.preventDefault();
 			target.focus();
-			value.set(target.getAttribute("data-value"));
+			group.select(target);
 		}
 	});
 
-	effect(() => {
-		const current = value.get();
-
-		untracked(() => sync(current));
-	});
-
-	onDispose(watchTree(root, () => sync(value.get())));
-
-	return root;
+	return RadioGroupContext.provide(root, group);
 };
 
 /** `RadioGroupItem({ value, id, disabled })`. */
 export const RadioGroupItem = (...args) => {
 	const { props } = parseArgs(args);
 	const [own, rest] = pick(props, ["class", "value"]);
-
-	return el("button", Object.assign({
-		type: "button",
-		role: "radio",
-		"data-slot": "radio-group-item",
-		"data-value": String(own.value)
-	}, rest, {
-		class: cn("aspect-square size-4 shrink-0 rounded-full border border-input text-primary shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:ring-destructive/40", own.class)
-	}), el("span", {
+	const itemValue = String(own.value);
+	const indicator = el("span", {
 		"data-slot": "radio-group-indicator",
 		class: "relative flex items-center justify-center",
 		hidden: true
-	}, CircleIcon({ class: "absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 fill-primary" })));
+	}, CircleIcon({ class: "absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 fill-primary" }));
+
+	const node = el("button", Object.assign({
+		type: "button",
+		role: "radio",
+		"data-slot": "radio-group-item",
+		"data-value": itemValue
+	}, rest, {
+		class: cn("aspect-square size-4 shrink-0 rounded-full border border-input text-primary shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:ring-destructive/40", own.class)
+	}), indicator);
+
+	const join = joinGroup(node);
+
+	node.addEventListener("click", () => {
+		const group = RadioGroupContext.find(node).value;
+
+		if(group) {
+			group.select(node);
+		}
+	});
+
+	return RadioGroupContext.watch(node, (group) => {
+		join(group && group.items);
+
+		if(!group) {
+			return;
+		}
+
+		const current = group.value();
+		const on = itemValue === current;
+
+		if(group.disabled) {
+			node.disabled = true;
+			node.setAttribute("data-disabled", "");
+		}
+
+		node.setAttribute("aria-checked", String(on));
+		node.setAttribute("data-state", on ? "checked" : "unchecked");
+		indicator.setAttribute("data-state", on ? "checked" : "unchecked");
+		indicator.hidden = !on;
+		node.tabIndex = tabStop(group.items.list(), (item) => item.getAttribute("data-value") === current) === node ? 0 : -1;
+	});
 };
 
 let radioSeq = 0;

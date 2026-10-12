@@ -13,9 +13,10 @@
  * https://ui.shadcn.com/docs/components/tabs
  */
 
-import { el, effect, untracked, onDispose } from "@nemanjan00/qrp";
-import { parseArgs, pick, cn, variants, controllable, owned, watchTree, uid } from "../utils/index.js";
-import { ownerOf, isDisabled, roveTarget, bound } from "../utils/roving.js";
+import { el } from "@nemanjan00/qrp";
+import { createContext } from "@nemanjan00/qrp/context";
+import { parseArgs, pick, cn, variants, controllable, uid } from "../utils/index.js";
+import { members, joinGroup, tabStop, isDisabled, roveTarget, bound } from "../utils/roving.js";
 
 export const tabsListVariants = variants(
 	"group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground group-data-[orientation=horizontal]/tabs:h-9 group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none",
@@ -41,6 +42,9 @@ const TRIGGER = [
 
 const safeId = (value) => String(value).replace(/[^a-zA-Z0-9_-]/g, "_");
 
+/** The Tabs controller its parts read: value, orientation, ids, trigger set. */
+const TabsContext = createContext(null);
+
 /**
  * Tabs root.
  *
@@ -59,125 +63,125 @@ export const Tabs = (...args) => {
 	const manual = own.activationMode === "manual";
 	const value = controllable(bound(own, "value"), own.defaultValue, own.onValueChange);
 	const base = uid("tabs");
+	const triggers = members();
+
+	const tabs = {
+		orientation,
+		triggers,
+		value: () => value.get(),
+		triggerId: (itemValue) => `${base}-trigger-${safeId(itemValue)}`,
+		contentId: (itemValue) => `${base}-content-${safeId(itemValue)}`,
+		select: (trigger) => {
+			if(trigger && !isDisabled(trigger)) {
+				value.set(trigger.getAttribute("data-value"));
+			}
+		}
+	};
 
 	const root = el("div", Object.assign({ "data-slot": "tabs", "data-orientation": orientation }, rest, {
 		class: cn("group/tabs flex gap-2 data-[orientation=horizontal]:flex-col", own.class)
 	}), ...children);
 
-	const triggers = () => owned(root, "tabs-trigger", "tabs");
-
-	const sync = (active) => {
-		owned(root, "tabs-list", "tabs").forEach((list) => list.setAttribute("aria-orientation", orientation));
-
-		triggers().forEach((trigger) => {
-			const itemValue = trigger.getAttribute("data-value");
-			const selected = itemValue === active;
-
-			trigger.id = `${base}-trigger-${safeId(itemValue)}`;
-			trigger.setAttribute("aria-controls", `${base}-content-${safeId(itemValue)}`);
-			trigger.setAttribute("aria-selected", String(selected));
-			trigger.setAttribute("data-state", selected ? "active" : "inactive");
-			trigger.setAttribute("data-orientation", orientation);
-			trigger.tabIndex = selected ? 0 : -1;
-		});
-
-		owned(root, "tabs-content", "tabs").forEach((content) => {
-			const itemValue = content.getAttribute("data-value");
-			const selected = itemValue === active;
-
-			content.id = `${base}-content-${safeId(itemValue)}`;
-			content.setAttribute("aria-labelledby", `${base}-trigger-${safeId(itemValue)}`);
-			content.setAttribute("data-state", selected ? "active" : "inactive");
-			content.setAttribute("data-orientation", orientation);
-			content.hidden = !selected && !content.hasAttribute("data-force-mount");
-		});
-
-		// Nothing selectable has focus: let Tab reach the first enabled trigger.
-		const all = triggers();
-
-		if(!all.some((trigger) => trigger.tabIndex === 0)) {
-			const first = all.find((trigger) => !isDisabled(trigger));
-
-			if(first) {
-				first.tabIndex = 0;
-			}
-		}
-	};
-
-	const select = (trigger) => {
-		if(trigger && !isDisabled(trigger)) {
-			value.set(trigger.getAttribute("data-value"));
-		}
-	};
-
-	root.addEventListener("click", (event) => {
-		const trigger = event.target.closest("[data-slot=tabs-trigger]");
-
-		if(trigger && ownerOf(trigger, "tabs") === root) {
-			select(trigger);
-		}
-	});
-
 	root.addEventListener("keydown", (event) => {
 		const trigger = event.target.closest("[data-slot=tabs-trigger]");
 
-		if(!trigger || ownerOf(trigger, "tabs") !== root) {
+		if(!trigger || !triggers.has(trigger)) {
 			return;
 		}
 
-		const target = roveTarget(event, triggers().filter((item) => !isDisabled(item)), { orientation });
+		const target = roveTarget(event, triggers.list().filter((item) => !isDisabled(item)), { orientation });
 
 		if(target) {
 			event.preventDefault();
 			target.focus();
 
 			if(!manual) {
-				select(target);
+				tabs.select(target);
 			}
 		}
 	});
 
-	effect(() => {
-		const active = value.get();
-
-		untracked(() => sync(active));
-	});
-
-	onDispose(watchTree(root, () => sync(value.get())));
-
-	return root;
+	return TabsContext.provide(root, tabs);
 };
 
 export const TabsList = (...args) => {
 	const { props, children } = parseArgs(args);
 	const [own, rest] = pick(props, ["class", "variant", "loop"]);
 
-	return el("div", Object.assign({ "data-slot": "tabs-list", "data-variant": own.variant || "default", role: "tablist" }, rest, {
+	return TabsContext.watch(el("div", Object.assign({ "data-slot": "tabs-list", "data-variant": own.variant || "default", role: "tablist" }, rest, {
 		class: tabsListVariants({ variant: own.variant, class: own.class })
-	}), ...children);
+	}), ...children), (tabs, node) => {
+		if(tabs) {
+			node.setAttribute("aria-orientation", tabs.orientation);
+		}
+	});
 };
 
 export const TabsTrigger = (...args) => {
 	const { props, children } = parseArgs(args);
 	const [own, rest] = pick(props, ["class", "value"]);
+	const itemValue = String(own.value);
 
-	return el("button", Object.assign({ type: "button", role: "tab", "data-slot": "tabs-trigger", "data-value": String(own.value) }, rest, {
+	const node = el("button", Object.assign({ type: "button", role: "tab", "data-slot": "tabs-trigger", "data-value": itemValue }, rest, {
 		class: cn(TRIGGER, own.class)
 	}), ...children);
+
+	const join = joinGroup(node);
+
+	node.addEventListener("click", () => {
+		const tabs = TabsContext.find(node).value;
+
+		if(tabs) {
+			tabs.select(node);
+		}
+	});
+
+	return TabsContext.watch(node, (tabs) => {
+		join(tabs && tabs.triggers);
+
+		if(!tabs) {
+			return;
+		}
+
+		const active = tabs.value();
+		const selected = itemValue === active;
+		// The trigger Tab lands on: the active one, else the first enabled.
+		const stop = tabStop(tabs.triggers.list(), (item) => item.getAttribute("data-value") === active);
+
+		node.id = tabs.triggerId(itemValue);
+		node.setAttribute("aria-controls", tabs.contentId(itemValue));
+		node.setAttribute("aria-selected", String(selected));
+		node.setAttribute("data-state", selected ? "active" : "inactive");
+		node.setAttribute("data-orientation", tabs.orientation);
+		node.tabIndex = stop === node ? 0 : -1;
+	});
 };
 
 /** `TabsContent({ value, forceMount })` — forceMount keeps it in the layout when inactive. */
 export const TabsContent = (...args) => {
 	const { props, children } = parseArgs(args);
 	const [own, rest] = pick(props, ["class", "value", "forceMount"]);
+	const itemValue = String(own.value);
 
-	return el("div", Object.assign({
+	return TabsContext.watch(el("div", Object.assign({
 		"data-slot": "tabs-content",
 		role: "tabpanel",
 		tabindex: "0",
-		"data-value": String(own.value),
+		"data-value": itemValue,
 		"data-force-mount": own.forceMount ? true : null
 	}, rest, {
 		class: cn("flex-1 outline-none", own.class)
-	}), ...children);
+	}), ...children), (tabs, node) => {
+		if(!tabs) {
+			return;
+		}
+
+		const selected = itemValue === tabs.value();
+
+		node.id = tabs.contentId(itemValue);
+		node.setAttribute("aria-labelledby", tabs.triggerId(itemValue));
+		node.setAttribute("data-state", selected ? "active" : "inactive");
+		node.setAttribute("data-orientation", tabs.orientation);
+		node.hidden = !selected && !own.forceMount;
+	});
 };

@@ -14,16 +14,20 @@
  * https://ui.shadcn.com/docs/components/accordion
  */
 
-import { el, effect, untracked, onDispose } from "@nemanjan00/qrp";
+import { el } from "@nemanjan00/qrp";
 import { disclosure } from "@nemanjan00/qrp/behaviors/disclosure";
-import { parseArgs, pick, cn, part, controllable, owned, watchTree, uid } from "../utils/index.js";
-import { ownerOf, isDisabled, roveTarget, showPanel, bound } from "../utils/roving.js";
+import { createContext } from "@nemanjan00/qrp/context";
+import { parseArgs, pick, cn, part, controllable, uid } from "../utils/index.js";
+import { members, joinGroup, isDisabled, roveTarget, showPanel, bound } from "../utils/roving.js";
 import { ChevronDownIcon } from "../icons/index.js";
 
 const HEIGHT_VAR = "--radix-accordion-content-height";
 
-// item element → { disclosure, render }
-const itemState = new WeakMap();
+/** The root controller items read: open values, type, trigger set. */
+const AccordionContext = createContext(null);
+
+/** One item's state its trigger/content read: disclosure, value, ids. */
+const AccordionItemContext = createContext(null);
 
 const asList = (value) => {
 	if(Array.isArray(value)) {
@@ -53,68 +57,39 @@ export const Accordion = (...args) => {
 	const orientation = own.orientation || "vertical";
 	const fallback = own.defaultValue !== undefined ? own.defaultValue : (multiple ? [] : "");
 	const value = controllable(bound(own, "value"), fallback, own.onValueChange);
+	const triggers = members();
+
+	const accordion = {
+		multiple,
+		orientation,
+		triggers,
+		collapsible: Boolean(own.collapsible),
+		disabled: Boolean(own.disabled),
+		isOpen: (itemValue) => asList(value.get()).includes(itemValue),
+		toggle: (itemValue) => {
+			const open = asList(value.get());
+			const isOpen = open.includes(itemValue);
+
+			if(multiple) {
+				value.set(isOpen ? open.filter((entry) => entry !== itemValue) : open.concat([itemValue]));
+			} else if(!isOpen) {
+				value.set(itemValue);
+			} else if(own.collapsible) {
+				value.set("");
+			}
+		}
+	};
 
 	const root = el("div", Object.assign({ "data-slot": "accordion", "data-orientation": orientation }, rest), ...children);
-
-	const items = () => owned(root, "accordion-item", "accordion");
-	const partOf = (item, slot) => owned(item, slot, "accordion-item")[0];
-	const itemDisabled = (item) => Boolean(own.disabled) || item.hasAttribute("data-disabled");
-
-	const sync = (current) => {
-		const open = asList(current);
-
-		items().forEach((item) => {
-			const entry = itemState.get(item);
-			const trigger = partOf(item, "accordion-trigger");
-			const isOpen = open.includes(item.getAttribute("data-value"));
-
-			item.setAttribute("data-orientation", orientation);
-
-			if(trigger) {
-				trigger.disabled = itemDisabled(item);
-				// Single + not collapsible: the open item can't be closed — say so.
-				trigger.setAttribute("aria-disabled", String(isOpen && !multiple && !own.collapsible));
-			}
-
-			if(entry) {
-				entry.disclosure.state.open = isOpen;
-				entry.render();
-			}
-		});
-	};
-
-	const toggle = (item) => {
-		const itemValue = item.getAttribute("data-value");
-		const open = asList(value.get());
-		const isOpen = open.includes(itemValue);
-
-		if(multiple) {
-			value.set(isOpen ? open.filter((entry) => entry !== itemValue) : open.concat([itemValue]));
-		} else if(!isOpen) {
-			value.set(itemValue);
-		} else if(own.collapsible) {
-			value.set("");
-		}
-	};
-
-	root.addEventListener("click", (event) => {
-		const trigger = event.target.closest("[data-slot=accordion-trigger]");
-		const item = trigger ? ownerOf(trigger, "accordion-item") : null;
-
-		if(item && ownerOf(item, "accordion") === root && !itemDisabled(item)) {
-			toggle(item);
-		}
-	});
 
 	root.addEventListener("keydown", (event) => {
 		const trigger = event.target.closest("[data-slot=accordion-trigger]");
 
-		if(!trigger || ownerOf(ownerOf(trigger, "accordion-item") || trigger, "accordion") !== root) {
+		if(!trigger || !triggers.has(trigger)) {
 			return;
 		}
 
-		const triggers = items().map((item) => partOf(item, "accordion-trigger")).filter((node) => node && !isDisabled(node));
-		const target = roveTarget(event, triggers, { orientation, loop: true });
+		const target = roveTarget(event, triggers.list().filter((node) => !isDisabled(node)), { orientation, loop: true });
 
 		if(target) {
 			event.preventDefault();
@@ -122,15 +97,7 @@ export const Accordion = (...args) => {
 		}
 	});
 
-	effect(() => {
-		const current = value.get();
-
-		untracked(() => sync(current));
-	});
-
-	onDispose(watchTree(root, () => sync(value.get())));
-
-	return root;
+	return AccordionContext.provide(root, accordion);
 };
 
 const AccordionItemBase = part("div", "accordion-item", "border-b last:border-b-0", {
@@ -138,70 +105,103 @@ const AccordionItemBase = part("div", "accordion-item", "border-b last:border-b-
 	data: (own) => ({ "data-value": String(own.value), "data-disabled": own.disabled ? true : null })
 });
 
-/**
- * Render an item from its disclosure: state attributes, aria wiring, and the
- * animated panel. Re-run by the root too, for parts that mount later.
- */
-const renderItem = (item, d) => () => {
-	const isOpen = d.state.open;
-	const state = isOpen ? "open" : "closed";
-	const trigger = owned(item, "accordion-trigger", "accordion-item")[0];
-	const content = owned(item, "accordion-content", "accordion-item")[0];
-	const orientation = item.getAttribute("data-orientation") || "vertical";
-
-	item.setAttribute("data-state", state);
-
-	if(trigger) {
-		trigger.id = trigger.id || uid("accordion-trigger");
-		trigger.setAttribute("aria-expanded", String(isOpen));
-		trigger.setAttribute("data-state", state);
-		trigger.setAttribute("data-orientation", orientation);
-
-		if(trigger.parentElement && trigger.parentElement.tagName === "H3") {
-			trigger.parentElement.setAttribute("data-state", state);
-			trigger.parentElement.setAttribute("data-orientation", orientation);
-		}
-	}
-
-	if(content) {
-		content.id = content.id || uid("accordion-content");
-		content.setAttribute("data-orientation", orientation);
-
-		if(trigger) {
-			trigger.setAttribute("aria-controls", content.id);
-			content.setAttribute("aria-labelledby", trigger.id);
-		}
-
-		showPanel(content, isOpen, HEIGHT_VAR);
-	}
-};
-
 /** `AccordionItem({ value, disabled }, AccordionTrigger(…), AccordionContent(…))`. */
 export const AccordionItem = (...args) => {
-	const item = AccordionItemBase(...args);
-	const d = disclosure(false);
-	const render = renderItem(item, d);
+	const { props } = parseArgs(args);
+	const node = AccordionItemBase(...args);
+	const item = {
+		value: String(props.value),
+		disabled: Boolean(props.disabled),
+		disclosure: disclosure(false),
+		triggerId: uid("accordion-trigger"),
+		contentId: uid("accordion-content"),
+		orientation: () => node.getAttribute("data-orientation") || "vertical"
+	};
 
-	itemState.set(item, { disclosure: d, render: () => untracked(render) });
-	effect(render);
+	// The root decides which items are open; the item's disclosure mirrors it.
+	AccordionContext.watch(node, (accordion) => {
+		if(accordion) {
+			node.setAttribute("data-orientation", accordion.orientation);
+			item.disclosure.state.open = accordion.isOpen(item.value);
+		}
+	});
 
-	return item;
+	AccordionItemContext.watch(node, () => {
+		node.setAttribute("data-state", item.disclosure.state.open ? "open" : "closed");
+	});
+
+	return AccordionItemContext.provide(node, item);
 };
 
 export const AccordionTrigger = (...args) => {
 	const { props, children } = parseArgs(args);
 	const [own, rest] = pick(props, ["class"]);
 
-	return el("h3", { class: "flex" }, el("button", Object.assign({ type: "button", "data-slot": "accordion-trigger" }, rest, {
+	const trigger = el("button", Object.assign({ type: "button", "data-slot": "accordion-trigger" }, rest, {
 		class: cn("flex flex-1 items-start justify-between gap-4 rounded-md py-4 text-left text-sm font-medium transition-all outline-none hover:underline focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&[data-state=open]>svg]:rotate-180", own.class)
-	}), ...children, ChevronDownIcon({ class: "pointer-events-none size-4 shrink-0 translate-y-0.5 text-muted-foreground transition-transform duration-200" })));
+	}), ...children, ChevronDownIcon({ class: "pointer-events-none size-4 shrink-0 translate-y-0.5 text-muted-foreground transition-transform duration-200" }));
+	const heading = el("h3", { class: "flex" }, trigger);
+	const join = joinGroup(trigger);
+
+	trigger.addEventListener("click", () => {
+		const accordion = AccordionContext.find(trigger).value;
+		const item = AccordionItemContext.find(trigger).value;
+
+		if(accordion && item && !accordion.disabled && !item.disabled) {
+			accordion.toggle(item.value);
+		}
+	});
+
+	AccordionContext.watch(trigger, (accordion) => {
+		join(accordion && accordion.triggers);
+
+		const item = AccordionItemContext.read(trigger);
+
+		if(accordion && item) {
+			const isOpen = item.disclosure.state.open;
+
+			trigger.disabled = accordion.disabled || item.disabled;
+			// Single + not collapsible: the open item can't be closed — say so.
+			trigger.setAttribute("aria-disabled", String(isOpen && !accordion.multiple && !accordion.collapsible));
+		}
+	});
+
+	AccordionItemContext.watch(trigger, (item) => {
+		if(!item) {
+			return;
+		}
+
+		const isOpen = item.disclosure.state.open;
+		const state = isOpen ? "open" : "closed";
+
+		trigger.id = item.triggerId;
+		trigger.setAttribute("aria-controls", item.contentId);
+		trigger.setAttribute("aria-expanded", String(isOpen));
+		trigger.setAttribute("data-state", state);
+		trigger.setAttribute("data-orientation", item.orientation());
+		heading.setAttribute("data-state", state);
+		heading.setAttribute("data-orientation", item.orientation());
+	});
+
+	return heading;
 };
 
 export const AccordionContent = (...args) => {
 	const { props, children } = parseArgs(args);
 	const [own, rest] = pick(props, ["class"]);
 
-	return el("div", Object.assign({ "data-slot": "accordion-content", role: "region" }, rest, {
+	return AccordionItemContext.watch(el("div", Object.assign({ "data-slot": "accordion-content", role: "region" }, rest, {
 		class: "overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
-	}), el("div", { class: cn("pt-0 pb-4", own.class) }, ...children));
+	}), el("div", { class: cn("pt-0 pb-4", own.class) }, ...children)), (item, content) => {
+		if(!item) {
+			// Not inside an item yet: start closed (no animation on first render).
+			showPanel(content, false, HEIGHT_VAR);
+			return;
+		}
+
+		content.id = item.contentId;
+		content.setAttribute("aria-labelledby", item.triggerId);
+		content.setAttribute("data-orientation", item.orientation());
+		showPanel(content, item.disclosure.state.open, HEIGHT_VAR);
+	});
 };

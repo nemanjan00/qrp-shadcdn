@@ -11,12 +11,14 @@
  * https://ui.shadcn.com/docs/components/toggle-group
  */
 
-import { el, state, effect, untracked, onDispose } from "@nemanjan00/qrp";
-import { parseArgs, pick, cn, read, controllable, owned, watchTree } from "../utils/index.js";
-import { ownerOf, isDisabled, roveTarget, bound } from "../utils/roving.js";
+import { el } from "@nemanjan00/qrp";
+import { createContext } from "@nemanjan00/qrp/context";
+import { parseArgs, pick, cn, read, controllable } from "../utils/index.js";
+import { members, joinGroup, tabStop, isDisabled, roveTarget, bound } from "../utils/roving.js";
 import { toggleVariants } from "./toggle.js";
 
-const contexts = new WeakMap();
+/** The group controller items read: value, type, look (variant/size/spacing), item set. */
+const ToggleGroupContext = createContext(null);
 
 const asList = (value) => {
 	if(Array.isArray(value)) {
@@ -48,6 +50,27 @@ export const ToggleGroup = (...args) => {
 	const spacing = own.spacing || 0;
 	const fallback = own.defaultValue !== undefined ? own.defaultValue : (multiple ? [] : "");
 	const value = controllable(bound(own, "value"), fallback, own.onValueChange);
+	const items = members();
+
+	const group = {
+		multiple,
+		spacing,
+		items,
+		variant: own.variant,
+		size: own.size,
+		disabled: Boolean(own.disabled),
+		pressed: () => asList(value.get()),
+		toggle: (itemValue) => {
+			const pressed = asList(value.get());
+			const on = pressed.includes(itemValue);
+
+			if(multiple) {
+				value.set(on ? pressed.filter((entry) => entry !== itemValue) : pressed.concat([itemValue]));
+			} else {
+				value.set(on ? "" : itemValue);
+			}
+		}
+	};
 
 	const root = el("div", Object.assign({
 		"data-slot": "toggle-group",
@@ -62,75 +85,14 @@ export const ToggleGroup = (...args) => {
 
 	root.style.setProperty("--gap", String(spacing));
 
-	const items = () => owned(root, "toggle-group-item", "toggle-group");
-
-	const sync = (current) => {
-		const pressed = asList(current);
-		const all = items();
-
-		all.forEach((item) => {
-			const on = pressed.includes(item.getAttribute("data-value"));
-			const context = contexts.get(item);
-
-			if(context) {
-				context.variant = own.variant || context.ownVariant;
-				context.size = own.size || context.ownSize;
-				context.spacing = spacing;
-			}
-
-			if(own.disabled) {
-				item.disabled = true;
-			}
-
-			item.setAttribute("data-state", on ? "on" : "off");
-
-			if(multiple) {
-				item.removeAttribute("role");
-				item.removeAttribute("aria-checked");
-				item.setAttribute("aria-pressed", String(on));
-			} else {
-				item.setAttribute("role", "radio");
-				item.setAttribute("aria-checked", String(on));
-				item.removeAttribute("aria-pressed");
-			}
-
-			item.tabIndex = -1;
-		});
-
-		const enabled = all.filter((item) => !isDisabled(item));
-		const focusable = enabled.find((item) => item.getAttribute("data-state") === "on") || enabled[0];
-
-		if(focusable) {
-			focusable.tabIndex = 0;
-		}
-	};
-
-	root.addEventListener("click", (event) => {
-		const item = event.target.closest("[data-slot=toggle-group-item]");
-
-		if(!item || ownerOf(item, "toggle-group") !== root || isDisabled(item)) {
-			return;
-		}
-
-		const itemValue = item.getAttribute("data-value");
-		const pressed = asList(value.get());
-		const on = pressed.includes(itemValue);
-
-		if(multiple) {
-			value.set(on ? pressed.filter((entry) => entry !== itemValue) : pressed.concat([itemValue]));
-		} else {
-			value.set(on ? "" : itemValue);
-		}
-	});
-
 	root.addEventListener("keydown", (event) => {
 		const item = event.target.closest("[data-slot=toggle-group-item]");
 
-		if(!item || ownerOf(item, "toggle-group") !== root) {
+		if(!item || !items.has(item)) {
 			return;
 		}
 
-		const target = roveTarget(event, items().filter((node) => !isDisabled(node)), { orientation: own.orientation, loop: own.loop !== false });
+		const target = roveTarget(event, items.list().filter((node) => !isDisabled(node)), { orientation: own.orientation, loop: own.loop !== false });
 
 		if(target) {
 			event.preventDefault();
@@ -138,40 +100,62 @@ export const ToggleGroup = (...args) => {
 		}
 	});
 
-	effect(() => {
-		const current = value.get();
-
-		untracked(() => sync(current));
-	});
-
-	onDispose(watchTree(root, () => sync(value.get())));
-
-	return root;
+	return ToggleGroupContext.provide(root, group);
 };
 
-/** `ToggleGroupItem({ value, variant, size, disabled }, …children)`. */
+const ITEM = "w-auto min-w-0 shrink-0 px-3 focus:z-10 focus-visible:z-10 data-[spacing=0]:rounded-none data-[spacing=0]:shadow-none data-[spacing=0]:first:rounded-l-md data-[spacing=0]:last:rounded-r-md data-[spacing=0]:data-[variant=outline]:border-l-0 data-[spacing=0]:data-[variant=outline]:first:border-l";
+
+/** `ToggleGroupItem({ value, variant, size, disabled }, …children)` — the group's variant/size win. */
 export const ToggleGroupItem = (...args) => {
 	const { props, children } = parseArgs(args);
 	const [own, rest] = pick(props, ["class", "value", "variant", "size"]);
-	const context = state({ ownVariant: own.variant, ownSize: own.size, variant: own.variant, size: own.size, spacing: 0 });
+	const itemValue = String(own.value);
 
-	const node = el("button", Object.assign({
-		type: "button",
-		"data-slot": "toggle-group-item",
-		"data-value": String(own.value),
-		"data-variant": () => context.variant || "default",
-		"data-size": () => context.size || "default",
-		"data-spacing": () => String(context.spacing)
-	}, rest, {
-		class: () => read(cn(
-			toggleVariants({ variant: context.variant, size: context.size }),
-			"w-auto min-w-0 shrink-0 px-3 focus:z-10 focus-visible:z-10",
-			"data-[spacing=0]:rounded-none data-[spacing=0]:shadow-none data-[spacing=0]:first:rounded-l-md data-[spacing=0]:last:rounded-r-md data-[spacing=0]:data-[variant=outline]:border-l-0 data-[spacing=0]:data-[variant=outline]:first:border-l",
-			own.class
-		))
-	}), ...children);
+	const node = el("button", Object.assign({ type: "button", "data-slot": "toggle-group-item", "data-value": itemValue }, rest), ...children);
+	const join = joinGroup(node);
 
-	contexts.set(node, context);
+	node.addEventListener("click", () => {
+		const group = ToggleGroupContext.find(node).value;
 
-	return node;
+		if(group && !isDisabled(node)) {
+			group.toggle(itemValue);
+		}
+	});
+
+	return ToggleGroupContext.watch(node, (group) => {
+		join(group && group.items);
+
+		const variant = (group && group.variant) || own.variant;
+		const size = (group && group.size) || own.size;
+
+		node.setAttribute("data-variant", variant || "default");
+		node.setAttribute("data-size", size || "default");
+		node.setAttribute("data-spacing", String(group ? group.spacing : 0));
+		node.setAttribute("class", read(cn(toggleVariants({ variant, size }), ITEM, own.class)));
+
+		if(!group) {
+			return;
+		}
+
+		const pressed = group.pressed();
+		const on = pressed.includes(itemValue);
+
+		if(group.disabled) {
+			node.disabled = true;
+		}
+
+		node.setAttribute("data-state", on ? "on" : "off");
+
+		if(group.multiple) {
+			node.removeAttribute("role");
+			node.removeAttribute("aria-checked");
+			node.setAttribute("aria-pressed", String(on));
+		} else {
+			node.setAttribute("role", "radio");
+			node.setAttribute("aria-checked", String(on));
+			node.removeAttribute("aria-pressed");
+		}
+
+		node.tabIndex = tabStop(group.items.list(), (item) => pressed.includes(item.getAttribute("data-value"))) === node ? 0 : -1;
+	});
 };

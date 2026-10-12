@@ -451,3 +451,44 @@ test("forms adapters plug into qrp form()", () => {
 	press(thumb, "ArrowRight");
 	assert.equal(settings.level, 6);
 });
+
+// --- context: nesting and membership ------------------------------------------
+
+test("nested Tabs: each trigger belongs to its nearest Tabs (context), not the outer one", () => {
+	const inner = Tabs({ defaultValue: "x" },
+		TabsList(TabsTrigger({ value: "x" }, "X"), TabsTrigger({ value: "y" }, "Y")),
+		TabsContent({ value: "x" }, "inner x"), TabsContent({ value: "y" }, "inner y"));
+	const outer = Tabs({ defaultValue: "a" },
+		TabsList(TabsTrigger({ value: "a" }, "A"), TabsTrigger({ value: "b" }, "B")),
+		TabsContent({ value: "a" }, inner), TabsContent({ value: "b" }, "outer b"));
+	const trigger = (root, text) => [...root.querySelectorAll("[data-slot=tabs-trigger]")].find((node) => node.textContent === text);
+
+	trigger(outer, "Y").click();
+	assert.equal(trigger(outer, "Y").dataset.state, "active", "inner tabs switched");
+	assert.equal(trigger(outer, "A").dataset.state, "active", "outer tabs untouched");
+	trigger(outer, "B").click();
+	assert.equal(trigger(outer, "B").dataset.state, "active");
+	assert.equal(trigger(outer, "Y").dataset.state, "active", "inner keeps its own value");
+});
+
+test("RadioGroup: list() items join and leave the group; the tab stop follows", async () => {
+	const s = state({ options: ["a", "b", "c"], value: "" });
+	const group = RadioGroup({ bind: [s, "value"] },
+		list(() => s.options, (option) => option, (option) => RadioGroupItem({ value: option })));
+
+	document.body.append(group);
+	await tick();
+
+	const item = (value) => group.querySelector(`[data-value=${value}]`);
+
+	assert.equal(item("a").tabIndex, 0, "nothing selected: the first item takes Tab");
+	s.options = ["b", "c"];
+	await tick();
+	assert.equal(item("a"), null);
+	assert.equal(item("b").tabIndex, 0, "the removed item left the group; the next one takes Tab");
+	item("c").click();
+	assert.equal(s.value, "c");
+	assert.equal(item("c").tabIndex, 0);
+	assert.equal(item("b").tabIndex, -1);
+	group.remove();
+});

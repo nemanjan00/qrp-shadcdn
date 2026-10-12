@@ -2,22 +2,114 @@
  * utils/roving.js — keyboard and show/hide plumbing shared by the composite
  * input components (Tabs, Accordion, Collapsible, ToggleGroup, RadioGroup).
  *
- * - `ownerOf`   the nearest enclosing root of a slot, so nested instances of
- *               the same component don't steal each other's items.
+ * - `members` / `joinGroup` the item set a composite root keeps: items find
+ *               their root through qrp `context` and join it, so a root knows
+ *               its own items (in document order, reactively) without querying
+ *               the DOM — and nested instances can't steal each other's items.
+ * - `ownerOf`   the nearest enclosing root of a slot (DOM-based; Collapsible).
  * - `roveTarget` arrow/Home/End roving focus, the WAI-ARIA composite pattern.
  * - `showPanel` open/close a panel with the Radix height animation contract
  *               (a CSS variable carries the measured height; the panel is only
  *               hidden once the close animation has finished).
  * - `disclosed` qrp's `disclosure` behavior as the open state, fed by any of
- *               our controlled forms (`[state, "key"]`, a thunk, or a plain value).
+ *               our controlled forms (`[state, "key"]`, a thunk, or a plain value)
+ *               — qrp 0.11+ does that natively; this keeps the old shape.
  * - `bound`     the source a control reads: its own prop, else qrp's `bind`.
  */
 
-import { effect, untracked } from "@nemanjan00/qrp";
+import { state, onDispose } from "@nemanjan00/qrp";
 import { disclosure } from "@nemanjan00/qrp/behaviors/disclosure";
 import { animateOut } from "./index.js";
 
-const isTuple = (source) => Array.isArray(source) && source.length === 2 && typeof source[1] === "string";
+const FOLLOWING = 4;
+
+const documentOrder = (a, b) => {
+	if(a === b) {
+		return 0;
+	}
+
+	return a.compareDocumentPosition(b) & FOLLOWING ? -1 : 1;
+};
+
+/**
+ * The item set of a composite root (tab triggers, radio items…). `list()` is
+ * reactive and in document order, so effects that read it re-run when an item
+ * joins or leaves — the context-era replacement for querying the DOM.
+ *
+ * @returns {{ add: Function, delete: Function, has: Function, list: Function }}
+ */
+export const members = () => {
+	const nodes = new Set();
+	const tick = state({ version: 0 });
+
+	return {
+		add: (node) => {
+			if(!nodes.has(node)) {
+				nodes.add(node);
+				tick.version += 1;
+			}
+		},
+		delete: (node) => {
+			if(nodes.delete(node)) {
+				tick.version += 1;
+			}
+		},
+		has: (node) => nodes.has(node),
+		list: () => {
+			void tick.version;
+
+			return [...nodes].sort(documentOrder);
+		}
+	};
+};
+
+/**
+ * Membership for one item: call the returned function with the root's
+ * `members()` (or null) each time the item's context resolves; it joins the
+ * new set, leaves the old one, and leaves for good when the item's scope is
+ * disposed (a list() row removed).
+ *
+ * @param {Element} node the item
+ * @returns {Function} (set|null) => void
+ */
+export const joinGroup = (node) => {
+	let current = null;
+
+	onDispose(() => {
+		if(current) {
+			current.delete(node);
+		}
+	});
+
+	return (set) => {
+		if(set === current) {
+			return;
+		}
+
+		if(current) {
+			current.delete(node);
+		}
+
+		current = set || null;
+
+		if(current) {
+			current.add(node);
+		}
+	};
+};
+
+/**
+ * The item that takes Tab: the selected enabled one, else the first enabled.
+ *
+ * @param {Element[]} items in document order
+ * @param {Function} selected (item) => boolean
+ * @returns {Element|undefined}
+ */
+export const tabStop = (items, selected) => {
+	const enabled = items.filter((item) => !isDisabled(item));
+
+	return enabled.find(selected) || enabled[0];
+};
 
 /**
  * The value source of a control: its own prop (`checked`, `value`, `open`…)
@@ -31,88 +123,25 @@ const isTuple = (source) => Array.isArray(source) && source.length === 2 && type
 export const bound = (own, key) => (own[key] !== undefined ? own[key] : own.bind);
 
 /**
- * Open state backed by qrp's `disclosure()`. Rendering reads `d.state.open`;
- * writes go through `set`, which respects who owns the value:
+ * Open state backed by qrp's `disclosure()` — which takes our controlled forms
+ * natively since qrp 0.11 (`[state, "key"]`, a thunk, or a plain value, plus
+ * `onChange`). Kept for its `{ disclosure, get, set }` shape.
  *
- * - `[state, "key"]` → writes the key; the disclosure mirrors it
- * - thunk            → only calls `onChange` (the owner decides); mirrors the thunk
- * - plain / none     → the disclosure IS the state (uncontrolled)
- *
- * @param {*} source the `open` prop (or `bind`)
- * @param {boolean} fallback initial open state when uncontrolled
+ * @param {*} source open prop: boolean, thunk, or [state, key]
+ * @param {boolean} [fallback] initial state when uncontrolled
  * @param {Function} [onChange] (open) => void
  * @returns {{ disclosure: object, get: Function, set: Function }}
  */
 export const disclosed = (source, fallback, onChange) => {
-	const notify = (value) => {
-		if(onChange) {
-			onChange(value);
-		}
-	};
-
-	if(isTuple(source)) {
-		const [obj, key] = source;
-		const d = disclosure(Boolean(obj[key]));
-
-		effect(() => {
-			const value = Boolean(obj[key]);
-
-			untracked(() => { d.state.open = value; });
-		});
-
-		return {
-			disclosure: d,
-			get: () => d.state.open,
-			set: (value) => {
-				if(Boolean(obj[key]) !== value) {
-					obj[key] = value;
-					notify(value);
-				}
-			}
-		};
-	}
-
-	if(typeof source === "function") {
-		const d = disclosure(Boolean(source()));
-
-		effect(() => {
-			const value = Boolean(source());
-
-			untracked(() => { d.state.open = value; });
-		});
-
-		return {
-			disclosure: d,
-			get: () => d.state.open,
-			set: (value) => {
-				if(Boolean(source()) !== value) {
-					notify(value);
-				}
-			}
-		};
-	}
-
-	const d = disclosure(source === undefined ? Boolean(fallback) : Boolean(source));
+	const d = disclosure(source === undefined ? Boolean(fallback) : source, { onChange });
 
 	return {
 		disclosure: d,
 		get: () => d.state.open,
-		set: (value) => {
-			if(d.state.open !== value) {
-				d.state.open = value;
-				notify(value);
-			}
-		}
+		set: (value) => { d.state.open = Boolean(value); }
 	};
 };
 
-/**
- * The closest ancestor (excluding the node itself) with data-slot `rootSlot`.
- *
- * @param {Element} node
- * @param {string} rootSlot
- * @returns {Element|null}
- */
 export const ownerOf = (node, rootSlot) => (node.parentElement ? node.parentElement.closest(`[data-slot="${rootSlot}"]`) : null);
 
 /**

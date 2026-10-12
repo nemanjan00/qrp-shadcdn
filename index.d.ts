@@ -146,9 +146,6 @@ export function splitContent(children: Renderable[], slot: string): { fragment: 
 /** Elements carrying a `data-qs-role` marker, the root included. */
 export function withRole(root: ParentNode, role: string): Element[];
 
-/** Elements with `data-slot="slot"` that belong to this root, not a nested instance. */
-export function owned(root: Element, slot: string, rootSlot: string): Element[];
-
 /** Run `sync` now and whenever the subtree gains or loses nodes; returns disconnect. */
 export function watchTree(root: Element, sync: () => void): () => void;
 
@@ -854,6 +851,10 @@ export interface ToastOptions {
 	/** ms; Infinity = sticky. */
 	duration?: number;
 	closeButton?: boolean;
+	/** Called when the toast is dismissed (close button, action, toast.dismiss). */
+	onDismiss?: (toast: ToastItem) => void;
+	/** Called when the toast's countdown runs out. */
+	onAutoClose?: (toast: ToastItem) => void;
 	[key: string]: any;
 }
 export interface ToastFn {
@@ -879,9 +880,16 @@ export interface ToastItem extends ToastOptions {
 	id: string | number;
 	variant: ToastVariant | string;
 	title?: Renderable;
+	/** True when the toast has no title (qrp fills in the variant name; don't show it). */
+	untitled?: boolean;
+	/** True while the toast plays its exit (qrp's `exitMs`). */
 	removed?: boolean;
 }
-/** A toast layer: per-toast timers and exits over a qrp toasts controller. */
+/**
+ * Sonner's semantics over a qrp toasts controller, which owns ids, countdowns,
+ * pause/resume and the exit phase. Create the controller with `timeout: 0` and
+ * the `exitMs` your exit animation takes: `toastLayer(createToasts({ timeout: 0, exitMs: 400 }))`.
+ */
 export interface ToastLayer {
 	controller: import("@nemanjan00/qrp/toasts").ToastsController;
 	items(): ToastItem[];
@@ -890,8 +898,9 @@ export interface ToastLayer {
 	dismiss(id?: string | number): void;
 	pause(): void;
 	resume(): void;
-	configure(next: Record<string, any>): void;
-	config: Record<string, any>;
+	/** Default `duration` (ms) and `limit`; the exit time is the controller's `exitMs`. */
+	configure(next: { duration?: number; limit?: number }): void;
+	config: { duration: number; limit: number };
 }
 export type ToasterPosition = "top-left" | "top-center" | "top-right" | "bottom-left" | "bottom-center" | "bottom-right";
 /** Mount once: `mount(document.body, () => Toaster())`. */
@@ -911,6 +920,13 @@ export const Toaster: QsComponent<{
 export const toast: ToastFn;
 /** The layer behind `toast()` and qrp's `notify`. */
 export const sonner: ToastLayer;
+/** Wrap a qrp toasts controller in sonner's semantics (for `Toaster({ toaster })`). */
+export function toastLayer(
+	controller: import("@nemanjan00/qrp/toasts").ToastsController,
+	options?: { duration?: number; limit?: number }
+): ToastLayer;
+/** sonner's `toast()` API bound to a layer. */
+export function toastApi(layer: ToastLayer): ToastFn;
 /** qrp's notify/bus — take them from this bundle so they reach the Toaster on a CDN page. */
 export { notify } from "@nemanjan00/qrp/toasts";
 export { bus } from "@nemanjan00/qrp/events";

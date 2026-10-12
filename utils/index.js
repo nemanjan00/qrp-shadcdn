@@ -290,18 +290,6 @@ export const uid = (prefix = "qs") => {
 };
 
 /**
- * Elements under `root` with the given data-slot that belong to THIS root —
- * not to a nested instance of the same component.
- *
- * @param {Element} root
- * @param {string} slot data-slot to find
- * @param {string} rootSlot data-slot of the owning component
- * @returns {Element[]}
- */
-export const owned = (root, slot, rootSlot) => [...root.querySelectorAll(`[data-slot="${slot}"]`)]
-	.filter((node) => node.parentElement && node.parentElement.closest(`[data-slot="${rootSlot}"]`) === root);
-
-/**
  * Run `sync` now and whenever the subtree of `root` gains or loses nodes, so
  * items added later through list()/when() pick up their state attributes.
  *

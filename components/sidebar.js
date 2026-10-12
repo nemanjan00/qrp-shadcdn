@@ -23,15 +23,16 @@
  * default "sidebar_state"; false disables — the qrp take on shadcn's cookie).
  * Ctrl/⌘+B toggles. Below 768px (qrp `media()`) the Sidebar is shown in a Sheet.
  *
- * Children are built before their parent, so parts can't read a context while
- * they are constructed. They resolve their provider lazily — the nearest
- * provider-owned ancestor at the moment they need it — and the provider
- * activates the Sidebars it contains once it is built.
+ * Parts find their provider through qrp `context` (SidebarContext): reads are
+ * reactive, so a part built before its provider (children are built first)
+ * resolves once the provider exists. The mobile Sheet's content provides the
+ * same controller, so parts moved into it keep working.
  * https://ui.shadcn.com/docs/components/sidebar
  */
 
-import { el, state, effect, untracked, onDispose } from "@nemanjan00/qrp";
+import { el, state, effect, untracked, scoped, onDispose } from "@nemanjan00/qrp";
 import { media, persisted } from "@nemanjan00/qrp/browser";
+import { createContext } from "@nemanjan00/qrp/context";
 import { part, parseArgs, pick, cn, variants } from "../utils/index.js";
 import { PanelLeftIcon } from "../icons/index.js";
 import { Button } from "./button.js";
@@ -50,32 +51,13 @@ const MOBILE_QUERY = "(max-width: 767px)";
 
 // --- provider lookup ----------------------------------------------------------
 
-// Elements that carry a controller: each provider's wrapper, and each mobile
-// Sheet content (which lives in <body>, outside the wrapper).
-const controllers = new WeakMap();
-
-// Bumped whenever a provider registers, so a thunk that looked for its provider
-// before the provider existed re-runs once it does.
-const registry = state({ version: 0 });
+/** The controller of the nearest SidebarProvider (or mobile sheet). */
+const SidebarContext = createContext(null);
 
 let lastController = null;
 
-/** The controller owning `node` (nearest registered ancestor), or null. */
-const controllerFor = (node) => {
-	registry.version;
-
-	let current = node;
-
-	while(current) {
-		if(controllers.has(current)) {
-			return controllers.get(current);
-		}
-
-		current = current.parentNode;
-	}
-
-	return null;
-};
+/** The controller owning `node`, or null. Reactive (a qrp context read). */
+const controllerFor = (node) => SidebarContext.read(node);
 
 /**
  * The sidebar controller: of the provider around `node` when given, else of the
@@ -95,15 +77,12 @@ export const useSidebar = (node) => {
 };
 
 const toggleFrom = (node) => {
-	const controller = controllerFor(node) || lastController;
+	const controller = SidebarContext.find(node).value || lastController;
 
 	if(controller) {
 		controller.toggleSidebar();
 	}
 };
-
-// Sidebar roots waiting for their provider: root -> activate(controller).
-const pending = new WeakMap();
 
 // --- provider -----------------------------------------------------------------
 
@@ -207,17 +186,7 @@ export const SidebarProvider = (...args) => {
 		Object.keys(own.style).forEach((key) => wrapper.style.setProperty(key, own.style[key]));
 	}
 
-	controllers.set(wrapper, controller);
 	lastController = controller;
-
-	[...wrapper.querySelectorAll("[data-slot=sidebar]")]
-		.filter((node) => pending.has(node) && node.parentElement.closest("[data-slot=sidebar-wrapper]") === wrapper)
-		.forEach((node) => {
-			const activate = pending.get(node);
-
-			pending.delete(node);
-			activate(controller);
-		});
 
 	const onKeyDown = (event) => {
 		if(event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
@@ -229,9 +198,7 @@ export const SidebarProvider = (...args) => {
 	window.addEventListener("keydown", onKeyDown);
 	onDispose(() => window.removeEventListener("keydown", onKeyDown));
 
-	untracked(() => { registry.version += 1; });
-
-	return wrapper;
+	return SidebarContext.provide(wrapper, controller);
 };
 
 // --- sidebar ------------------------------------------------------------------
@@ -251,7 +218,7 @@ const mobileSheet = (controller, desktopInner, side) => {
 		class: "w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
 	}, SheetHeader({ class: "sr-only" }, SheetTitle("Sidebar"), SheetDescription("Displays the mobile sidebar.")), mobileInner);
 
-	controllers.set(content, controller);
+	SidebarContext.provide(content, controller);
 	Sheet({ open: [controller, "openMobile"] }, content);
 
 	effect(() => {
@@ -328,15 +295,33 @@ export const Sidebar = (...args) => {
 		)
 	}), inner));
 
-	pending.set(root, (controller) => {
-		effect(() => {
-			const current = controller.state;
+	// Built once the provider is known, in its own scope (so re-runs of the
+	// watch below don't tear it down) that goes with this Sidebar's owner.
+	// `building` is set FIRST: mobileSheet() provides the controller to the
+	// sheet content, which re-runs context readers — including this watch.
+	let building = false;
+	let sheet = null;
 
-			root.setAttribute("data-state", current);
-			root.setAttribute("data-collapsible", current === "collapsed" ? collapsible : "");
-		});
+	onDispose(() => {
+		if(sheet) {
+			sheet.dispose();
+		}
+	});
 
-		mobileSheet(controller, inner, side);
+	SidebarContext.watch(root, (controller) => {
+		if(!controller) {
+			return;
+		}
+
+		const current = controller.state;
+
+		root.setAttribute("data-state", current);
+		root.setAttribute("data-collapsible", current === "collapsed" ? collapsible : "");
+
+		if(!building) {
+			building = true;
+			sheet = untracked(() => scoped(() => mobileSheet(controller, inner, side)));
+		}
 	});
 
 	return root;
@@ -516,10 +501,24 @@ export const SidebarMenuButton = (...args) => {
 	}
 
 	const tip = tooltipParts(own.tooltip);
-	const visible = () => {
-		const controller = controllerFor(button);
+	// The provider is looked up untracked (and cached once found): this gate is
+	// read inside the tooltip's layer effect, and a tracked context read there
+	// would re-run that effect when opening the layer re-parents nodes — it
+	// would re-enter before the layer handle exists. Hovering always happens
+	// after the provider exists, so a lazy lookup is enough; `state` and
+	// `isMobile` stay reactive.
+	let found = null;
+	const controller = () => {
+		if(!found) {
+			found = SidebarContext.find(button).value;
+		}
 
-		return Boolean(controller) && controller.state === "collapsed" && !controller.isMobile;
+		return found;
+	};
+	const visible = () => {
+		const current = controller();
+
+		return Boolean(current) && current.state === "collapsed" && !current.isMobile;
 	};
 
 	// Gate the OPEN state, not just visibility: a hidden-but-open tooltip would

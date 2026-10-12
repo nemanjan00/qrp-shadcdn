@@ -399,6 +399,9 @@ export const Toaster = (...args) => {
 		"aria-relevant": "additions text",
 		"aria-atomic": "false",
 		"data-slot": "sonner",
+		// Modals leave this region usable: a toast fired from a dialog must be
+		// clickable and announced (utils/layer.js hideOthers).
+		"data-qs-keep": "",
 		class: cn("toaster group", own.theme === "dark" ? "dark" : null, own.class),
 		// A string: custom properties don't survive Object.assign onto node.style.
 		style: [

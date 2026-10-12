@@ -41,7 +41,8 @@ export const legacyToaster = toastLayer(createToasts({ timeout: 0, exitMs: EXIT_
 export const ToastProvider = (...args) => fragmentOf(parseArgs(args).children);
 
 export const ToastViewport = part("ol", "toast-viewport", "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:top-auto sm:right-0 sm:bottom-0 sm:flex-col md:max-w-[420px]", {
-	attrs: { tabindex: "-1" }
+	// data-qs-keep: stays usable while a modal makes the page inert.
+	attrs: { tabindex: "-1", "data-qs-keep": "" }
 });
 
 // v4 themes have no --destructive-foreground; white is what v4 uses on destructive.

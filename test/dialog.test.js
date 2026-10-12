@@ -6,6 +6,7 @@ import {
 	Button, Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 	DialogFooter, DialogClose, Sheet, SheetTrigger, SheetContent, SheetTitle,
 	AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogTitle, AlertDialogAction, AlertDialogCancel,
+	Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Toaster, toast,
 	Drawer, DrawerTrigger, DrawerContent
 } from "../index.js";
 
@@ -300,4 +301,69 @@ test("modal scroll lock: scrollbar gap is padded; wheel/touch blocked outside th
 
 		document.body.replaceChildren();
 	}
+});
+
+test("a popup opened inside a modal can still scroll (wheel/touch over it isn't blocked)", async () => {
+	const dialog = state({ open: true });
+	const select = state({ open: false });
+
+	document.body.append(Dialog({ open: [dialog, "open"] }, DialogContent(DialogTitle("Pick"),
+		Select({ open: [select, "open"] },
+			SelectTrigger(SelectValue({ placeholder: "Fruit" })),
+			SelectContent(...Array.from({ length: 30 }, (_, i) => SelectItem({ value: `f${i}` }, `Fruit ${i}`)))))));
+	await tick();
+	select.open = true;
+	await tick();
+
+	const list = document.querySelector("[data-slot=select-content]");
+	const overList = new Event("wheel", { cancelable: true, bubbles: true });
+	const overPage = new Event("wheel", { cancelable: true, bubbles: true });
+
+	assert.ok(list !== null, "select is open");
+	list.querySelector("[data-slot=select-item]").dispatchEvent(overList);
+	document.body.dispatchEvent(overPage);
+	assert.equal(overList.defaultPrevented, false, "the select list scrolls");
+	assert.equal(overPage.defaultPrevented, true, "the page behind still doesn't");
+	document.body.replaceChildren();
+});
+
+test("toasts stay interactive while a modal is open", async () => {
+	const app = document.createElement("main");
+	const s = state({ open: false });
+
+	document.body.append(app);
+	mount(app, () => [Toaster(), buildDialog({ open: [s, "open"] })]);
+	s.open = true;
+	await tick();
+	toast("Saved");
+	await tick();
+
+	const toaster = document.querySelector("[data-sonner-toaster]");
+
+	assert.ok(toaster.closest("[inert]") === null, "the toast region is not inert");
+	assert.ok(document.querySelector("[data-slot=dialog-content]").closest("[inert]") === null);
+	assert.ok([...app.children].some((child) => child.hasAttribute("inert")), "the rest of the app is");
+	s.open = false;
+	await tick();
+	toast.dismiss();
+	document.body.replaceChildren();
+});
+
+test("clicking a toast doesn't dismiss the open dialog", async () => {
+	const app = document.createElement("main");
+	const s = state({ open: false });
+
+	document.body.append(app);
+	mount(app, () => [Toaster(), buildDialog({ open: [s, "open"] })]);
+	s.open = true;
+	await tick();
+	toast("Saved");
+	await tick();
+	pointer(document.querySelector("[data-sonner-toast]"));
+	assert.equal(s.open, true, "the dialog stays open");
+	pointer(document.body);
+	assert.equal(s.open, false, "a real outside click still dismisses");
+	await tick();
+	toast.dismiss();
+	document.body.replaceChildren();
 });

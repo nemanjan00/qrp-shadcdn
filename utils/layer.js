@@ -35,12 +35,16 @@ const PLACEMENT_DEFAULTS = { align: "center", collisionPadding: 8 };
 
 let scrollLocks = 0;
 let savedBody = null;
-const modalContents = new Set();
 
-const insideModal = (target) => [...modalContents].some((content) => content.contains(target));
+// Every open layer's content — the modal's AND popups opened while it is up (a
+// Select list in a Dialog is portaled to <body>, outside the dialog). Radix
+// calls these "shards". A modal's backdrop isn't content, so it stays blocked.
+const layerContents = new Set();
+
+const insideLayer = (target) => [...layerContents].some((content) => content.contains(target));
 
 const blockScroll = (event) => {
-	if(!insideModal(event.target)) {
+	if(!insideLayer(event.target)) {
 		event.preventDefault();
 	}
 };
@@ -87,38 +91,66 @@ const unlockScroll = () => {
 // that was inert before is left as it was.
 
 const inertCounts = new Map();
+/** Duck-typed `inside` node for qrp's dismissable: any [data-qs-keep] region. */
+const KEPT_REGIONS = {
+	contains: (target) => Boolean(target && target.closest && target.closest("[data-qs-keep]"))
+};
 
-const hideOthers = (keep) => {
-	const kept = keep.filter(Boolean);
-	const others = [...document.body.children].filter((child) =>
-		!kept.some((node) => child === node || child.contains(node)) &&
-		!["SCRIPT", "STYLE", "TEMPLATE"].includes(child.tagName));
+const SKIP_TAGS = ["SCRIPT", "STYLE", "TEMPLATE", "LINK", "META"];
 
-	others.forEach((child) => {
-		const count = inertCounts.get(child);
+const markInert = (node) => {
+	const count = inertCounts.get(node);
 
-		if(count === undefined) {
-			inertCounts.set(child, child.hasAttribute("inert") ? Infinity : 1);
-			child.setAttribute("inert", "");
-		} else {
-			inertCounts.set(child, count + 1);
-		}
-	});
+	if(count === undefined) {
+		inertCounts.set(node, node.hasAttribute("inert") ? Infinity : 1);
+		node.setAttribute("inert", "");
+	} else {
+		inertCounts.set(node, count + 1);
+	}
+};
 
-	return () => others.forEach((child) => {
-		const count = inertCounts.get(child);
+const unmarkInert = (node) => {
+	const count = inertCounts.get(node);
 
-		if(count === undefined || count === Infinity) {
+	if(count === undefined || count === Infinity) {
+		return;
+	}
+
+	if(count <= 1) {
+		inertCounts.delete(node);
+		node.removeAttribute("inert");
+	} else {
+		inertCounts.set(node, count - 1);
+	}
+};
+
+/**
+ * Mark everything inert except `keep` and anything marked `data-qs-keep` (the
+ * toast region — a "Saved" toast fired from a dialog must stay clickable and
+ * announced). Like Radix's hideOthers it walks down from <body>: a branch that
+ * contains a kept node is descended into, everything beside it is marked.
+ */
+const hideOthers = (keepNodes) => {
+	const keep = keepNodes.filter(Boolean).concat([...document.querySelectorAll("[data-qs-keep]")]);
+	const marked = [];
+
+	const walk = (parent) => [...parent.children].forEach((child) => {
+		if(SKIP_TAGS.includes(child.tagName) || keep.includes(child)) {
 			return;
 		}
 
-		if(count <= 1) {
-			inertCounts.delete(child);
-			child.removeAttribute("inert");
-		} else {
-			inertCounts.set(child, count - 1);
+		if(keep.some((node) => child.contains(node))) {
+			walk(child);
+			return;
 		}
+
+		markInert(child);
+		marked.push(child);
 	});
+
+	walk(document.body);
+
+	return () => marked.forEach(unmarkInert);
 };
 
 // Closes still waiting for their exit animation, by content node. Reopening the
@@ -210,9 +242,7 @@ export const openLayer = (options) => {
 	const behaviors = untracked(() => scoped(() => {
 		const removers = nodes.map((node) => portal(node, container, owner ? { owner } : {}));
 
-		if(modal) {
-			modalContents.add(content);
-		}
+		layerContents.add(content);
 
 		return {
 			removers,
@@ -220,7 +250,10 @@ export const openLayer = (options) => {
 			position: options.anchor ? anchored(reference, content, Object.assign({}, PLACEMENT_DEFAULTS, options.anchor)) : null,
 			release: modal ? trapFocus(content) : (wantsFocus ? moveFocus(content) : null),
 			undismiss: dismissable(content, onDismiss, {
-				inside,
+				// Kept regions (the toasts) count as inside every layer: undoing a
+				// save from a toast must not dismiss the dialog it came from.
+				// Matched live, so a Toaster mounted later is covered too.
+				inside: inside.concat([KEPT_REGIONS]),
 				modal,
 				escape: options.escape !== false,
 				outside: options.outside !== false
@@ -237,12 +270,12 @@ export const openLayer = (options) => {
 
 		closed = true;
 		behaviors.value.undismiss();
+		layerContents.delete(content);
 
 		if(modal) {
 			// Un-inert first: focus is about to return to the trigger, which an
 			// inert background would refuse.
 			behaviors.value.restore();
-			modalContents.delete(content);
 			unlockScroll();
 		}
 

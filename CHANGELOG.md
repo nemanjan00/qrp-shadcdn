@@ -7,6 +7,37 @@ can land in a minor — they're marked ⚠️ **BREAKING**. Newest first.
 
 _(nothing yet)_
 
+## 0.2.1
+
+- **Fix: reopening an overlay during its exit animation broke the page.** The
+  stale close's portal-undo removed the reused content node after the reopen —
+  open state true, no dialog, backdrop and scroll lock left behind. Affected
+  every overlay (dialogs, sheets, popovers, menus, selects). A close still in
+  flight is now finished before the same content opens again.
+- **Modals make the page behind them inert** (focus, clicks and the screen
+  reader's virtual cursor stay in the dialog), reference-counted for nested
+  modals, restored before focus returns to the trigger — like Radix's
+  `hideOthers`. Overlays opened from inside the modal stay interactive.
+- **Scroll lock without layout shift, and on iOS.** The body is padded by the
+  scrollbar width, and wheel/touch scrolling outside the open modal is blocked
+  (iOS Safari ignores `overflow: hidden`).
+- **Class merge fixes** (tailwind-merge semantics): corner radii no longer wipe
+  the base radius (`rounded-md rounded-tl-none`); arbitrary values are
+  classified by content (`text-[13px]` is a size, `font-[500]` a weight,
+  `border-[3px]` a width); shadow color is separate from shadow size;
+  `inset-shadow-*` isn't an inset; `!important` classes don't override plain
+  ones; `hover:md:` equals `md:hover:`.
+- **Accessibility** (Lighthouse/axe clean apart from shadcn's palette
+  contrast): Slider thumbs are named (root label, or Minimum/Maximum); Select
+  triggers fall back to their value text as name; InputOTP's input is named
+  "One-time code"; Chart surfaces get an `aria-label` from the config;
+  AvatarImage defaults `alt=""`; ItemGroup's Items are list items;
+  CommandSeparator is `role="none"`; Resizable groups drop an invalid
+  `aria-orientation`. A caller's `aria-label`/`alt` always wins.
+- **Small screens:** charts shrink with their container; the DataTable footer
+  wraps. The demo has no horizontal overflow down to 320px.
+- `npm run build:site` builds the demo as a static site (`render.yaml`).
+
 ## 0.2.0
 
 Built further on qrp (now `^0.12.2`): the pieces this package had to write for

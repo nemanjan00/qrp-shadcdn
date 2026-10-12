@@ -46,6 +46,11 @@ const unlockScroll = () => {
 	}
 };
 
+// Closes still waiting for their exit animation, by content node. Reopening the
+// same content (Dialog reuses its node) must finish that close first — else its
+// late portal-undo removes the node from under the new layer.
+const pendingCloses = new WeakMap();
+
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
 
 /**
@@ -113,6 +118,12 @@ export const openLayer = (options) => {
 		}
 	};
 
+	const pending = pendingCloses.get(content);
+
+	if(pending) {
+		pending();
+	}
+
 	setState(nodes, "open");
 
 	if(modal) {
@@ -160,8 +171,35 @@ export const openLayer = (options) => {
 		// Each node leaves on its OWN animationend: the overlay's fade is shorter
 		// than the content's exit, and waiting for both would let the finished
 		// overlay snap back to visible for the difference (a flash).
-		return Promise.all(nodes.map((node, index) => animateOut(node).then(() => behaviors.value.removers[index]())))
-			.then(() => behaviors.dispose());
+		const removed = nodes.map(() => false);
+		let finished = false;
+		const removeNode = (index) => {
+			if(!removed[index]) {
+				removed[index] = true;
+				behaviors.value.removers[index]();
+			}
+		};
+		const finish = () => {
+			if(finished) {
+				return;
+			}
+
+			finished = true;
+			nodes.forEach((_node, index) => removeNode(index));
+			behaviors.dispose();
+
+			if(pendingCloses.get(content) === finish) {
+				pendingCloses.delete(content);
+			}
+		};
+
+		pendingCloses.set(content, finish);
+
+		return Promise.all(nodes.map((node, index) => animateOut(node).then(() => {
+			if(!finished) {
+				removeNode(index);
+			}
+		}))).then(finish);
 	};
 
 	return {

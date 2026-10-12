@@ -154,3 +154,60 @@ test("Drawer: direction attribute and dismiss event", async () => {
 	assert.equal(content.isConnected, false);
 	document.body.replaceChildren();
 });
+
+test("reopening during the exit animation keeps the dialog (stale close must not remove the reused content)", async () => {
+	const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+	// Pretend closed nodes run a 60ms exit animation, so animateOut really waits.
+	const realStyle = globalThis.getComputedStyle;
+
+	globalThis.getComputedStyle = (node) => {
+		const style = realStyle(node);
+		const closing = node.getAttribute && node.getAttribute("data-state") === "closed";
+
+		return new Proxy(style, {
+			get: (target, key) => {
+				if(key === "animationName") {
+					return closing ? "exit" : "none";
+				}
+
+				if(key === "animationDuration") {
+					return closing ? "0.06s" : "0s";
+				}
+
+				const value = target[key];
+
+				return typeof value === "function" ? value.bind(target) : value;
+			}
+		});
+	};
+
+	const content = () => document.querySelector("[data-slot=dialog-content]");
+	const overlays = () => document.querySelectorAll("[data-slot=dialog-overlay]").length;
+
+	try {
+		const s = state({ open: true });
+
+		document.body.append(buildDialog({ open: [s, "open"] }));
+		await wait(5);
+
+		s.open = false;      // exit animation starts (60ms)
+		await wait(10);
+		s.open = true;       // reopen before it finishes
+		await wait(200);     // long past the stale close's animation + safety timer
+
+		// Compare DOM nodes with assert.ok — a failing assert.equal diffs whole nodes.
+		assert.ok(content() !== null && content().isConnected, "content is still in the document");
+		assert.equal(content().dataset.state, "open");
+		assert.equal(overlays(), 1, "exactly one backdrop");
+		assert.equal(document.body.style.overflow, "hidden", "scroll stays locked while open");
+
+		s.open = false;
+		await wait(200);
+		assert.ok(content() === null, "content leaves after the final close");
+		assert.equal(overlays(), 0);
+		assert.equal(document.body.style.overflow, "", "scroll unlocked after the final close");
+	} finally {
+		globalThis.getComputedStyle = realStyle;
+		document.body.replaceChildren();
+	}
+});

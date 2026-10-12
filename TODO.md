@@ -41,7 +41,7 @@ bundle, and tested. Each links to the shadcn docs page it mirrors.
 - [x] [Select](https://ui.shadcn.com/docs/components/select)
 - [x] [Separator](https://ui.shadcn.com/docs/components/separator)
 - [x] [Sheet](https://ui.shadcn.com/docs/components/sheet)
-- [ ] [Sidebar](https://ui.shadcn.com/docs/components/sidebar)
+- [x] [Sidebar](https://ui.shadcn.com/docs/components/sidebar)
 - [x] [Skeleton](https://ui.shadcn.com/docs/components/skeleton)
 - [x] [Slider](https://ui.shadcn.com/docs/components/slider)
 - [x] [Sonner](https://ui.shadcn.com/docs/components/sonner)

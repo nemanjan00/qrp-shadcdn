@@ -320,11 +320,27 @@ export const SelectValue = (...args) => {
 /**
  * `SelectTrigger({ size: "default" | "sm" }, SelectValue(…))`.
  */
+/**
+ * Name the trigger when nothing else does: no aria-label / aria-labelledby from
+ * the caller and no <label for> pointing at it (checked once the trigger is in
+ * the page) → it is labelled by its own value text, like a native select.
+ */
+const nameByValue = (trigger) => queueMicrotask(() => {
+	const labelled = trigger.hasAttribute("aria-label") || trigger.hasAttribute("aria-labelledby") ||
+		(trigger.labels && trigger.labels.length > 0);
+	const value = trigger.querySelector("[data-slot=select-value]");
+
+	if(!labelled && value) {
+		value.id = value.id || uid("select-value");
+		trigger.setAttribute("aria-labelledby", value.id);
+	}
+});
+
 export const SelectTrigger = (...args) => {
 	const { props, children } = parseArgs(args);
 	const [own, rest] = pick(props, ["class", "size"]);
 
-	return el("button", Object.assign({
+	const trigger = el("button", Object.assign({
 		type: "button",
 		role: "combobox",
 		"aria-autocomplete": "none",
@@ -335,6 +351,10 @@ export const SelectTrigger = (...args) => {
 	}, rest, {
 		class: cn("flex w-fit items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-[placeholder]:text-muted-foreground data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground", own.class)
 	}), ...children, ChevronDownIcon({ class: "size-4 opacity-50" }));
+
+	nameByValue(trigger);
+
+	return trigger;
 };
 
 export const SelectScrollUpButton = part("div", "select-scroll-up-button", "flex cursor-default items-center justify-center py-1", {

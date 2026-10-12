@@ -387,3 +387,25 @@ test("useIsMobile reads qrp media()", () => {
 	assert.equal(typeof read.media.matches, "boolean");
 	mounted.dispose();
 });
+
+test("a11y: ItemGroup's items are listitems; a link item keeps its role and the group drops list", async () => {
+	const { ItemGroup: G, Item: I, ItemSeparator: Sep } = await import("../index.js");
+	const { state: st, list: ls } = await import("@nemanjan00/qrp");
+	const rows = st({ items: ["a"] });
+	const group = G(I("one"), Sep(), ls(() => rows.items, (r) => r, (r) => I(r)));
+
+	document.body.append(group);
+	assert.equal(group.getAttribute("role"), "list");
+	assert.ok([...group.querySelectorAll("[data-slot=item]")].every((item) => item.getAttribute("role") === "listitem"));
+	assert.equal(group.querySelector("[data-slot=item-separator]").getAttribute("role"), "none");
+
+	rows.items = ["a", "b"];
+	await new Promise((resolve) => setTimeout(resolve, 5));
+	assert.equal([...group.querySelectorAll("[data-slot=item]")].pop().getAttribute("role"), "listitem", "items added later are marked");
+
+	const links = G(I({ as: "a", href: "#" }, "link"));
+
+	assert.equal(links.hasAttribute("role"), false);
+	assert.equal(links.querySelector("a").hasAttribute("role"), false, "the link keeps its link role");
+	group.remove();
+});

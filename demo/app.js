@@ -25,7 +25,7 @@ const slug = (name) => name.toLowerCase().replace(/\s+/g, "-");
 
 const section = (entry) => el("section", { id: slug(entry.name), class: "scroll-mt-20 space-y-3" },
 	el("h2", { class: "text-xl font-semibold tracking-tight" }, entry.name),
-	el("div", { class: "flex min-h-[200px] w-full items-center justify-center rounded-lg border p-10" }, entry.build())
+	el("div", { class: "flex min-h-[200px] w-full min-w-0 items-center justify-center rounded-lg border p-4 sm:p-10" }, entry.build())
 );
 
 effect(() => document.documentElement.classList.toggle("dark", theme.dark));

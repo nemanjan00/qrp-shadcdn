@@ -81,6 +81,7 @@ export const InputOTP = (...args) => {
 		"data-slot": "input-otp",
 		"data-input-otp": "true",
 		autocomplete: "one-time-code",
+		"aria-label": "One-time code",
 		inputmode: digits ? "numeric" : "text",
 		spellcheck: false,
 		maxLength,

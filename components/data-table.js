@@ -308,18 +308,20 @@ export const DataTablePagination = (...args) => {
 	const sizes = own.pageSizes || dt.pageSizes;
 	const pages = () => Math.max(1, grid.pageCount());
 
-	return el("div", Object.assign({ "data-slot": "data-table-pagination" }, rest, { class: cn("flex items-center justify-between px-2", own.class) }),
-		el("div", { class: "flex-1 text-sm text-muted-foreground" },
+	// Wraps on phones: the selection count takes its own line below `sm`, the
+	// "Rows per page" label hides, first/last buttons stay lg-only.
+	return el("div", Object.assign({ "data-slot": "data-table-pagination" }, rest, { class: cn("flex flex-wrap items-center justify-between gap-y-2 px-2", own.class) }),
+		el("div", { class: "w-full text-sm text-muted-foreground sm:w-auto sm:flex-1" },
 			own.selection === false ? null : () => `${grid.selectedItems().length} of ${grid.total()} row(s) selected.`),
-		el("div", { class: "flex items-center space-x-6 lg:space-x-8" },
-			el("div", { class: "flex items-center space-x-2" },
-				el("p", { class: "text-sm font-medium" }, "Rows per page"),
+		el("div", { class: "flex w-full items-center justify-between gap-4 sm:w-auto sm:justify-end sm:gap-6 lg:gap-8" },
+			el("div", { class: "flex items-center gap-2" },
+				el("p", { class: "hidden text-sm font-medium sm:block" }, "Rows per page"),
 				Select({ value: () => String(dt.page.size), onValueChange: (value) => grid.setPageSize(Number(value)) },
 					SelectTrigger({ class: "h-8 w-[70px]", "aria-label": "Rows per page" }, SelectValue()),
 					SelectContent({ side: "top" }, ...sizes.map((size) => SelectItem({ value: String(size) }, String(size)))))),
 			el("div", { class: "flex w-[100px] items-center justify-center text-sm font-medium" },
 				() => `Page ${Math.min(dt.page.index + 1, pages())} of ${pages()}`),
-			el("div", { class: "flex items-center space-x-2" },
+			el("div", { class: "flex items-center gap-2" },
 				pagerButton("Go to first page", ChevronsLeftIcon(), () => grid.goto(0), () => !grid.hasPrev(), "hidden lg:flex"),
 				pagerButton("Go to previous page", ChevronLeftIcon(), () => grid.prev(), () => !grid.hasPrev()),
 				pagerButton("Go to next page", ChevronRightIcon(), () => grid.next(), () => !grid.hasNext()),

@@ -90,7 +90,7 @@ demo("Combobox", () => {
 
 	// The classic shadcn combobox: Popover + Command.
 	const classic = Popover({ open: [s, "open"] },
-		PopoverTrigger(Button({ variant: "outline", role: "combobox", class: "w-[200px] justify-between" },
+		PopoverTrigger(Button({ variant: "outline", role: "combobox", "aria-label": "Select framework", class: "w-[200px] justify-between" },
 			el("span", {}, () => labelOf(s.value) || "Select framework..."),
 			ChevronsUpDownIcon({ class: "opacity-50" }))),
 		PopoverContent({ class: "w-[200px] p-0" }, Command(
@@ -123,13 +123,13 @@ demo("Native Select", () => {
 	const s = state({ status: "" });
 
 	return el("div", { class: "flex flex-col items-center gap-4" },
-		NativeSelect({ bind: [s, "status"] },
+		NativeSelect({ bind: [s, "status"], "aria-label": "Status" },
 			NativeSelectOption({ value: "" }, "Select status"),
 			NativeSelectOption({ value: "todo" }, "Todo"),
 			NativeSelectOption({ value: "in-progress" }, "In Progress"),
 			NativeSelectOption({ value: "done" }, "Done"),
 			NativeSelectOption({ value: "cancelled" }, "Cancelled")),
-		NativeSelect({ size: "sm" },
+		NativeSelect({ size: "sm", "aria-label": "Priority" },
 			NativeSelectOptGroup({ label: "Engineering" }, NativeSelectOption({ value: "frontend" }, "Frontend"), NativeSelectOption({ value: "backend" }, "Backend")),
 			NativeSelectOptGroup({ label: "Sales" }, NativeSelectOption({ value: "sales-rep" }, "Sales Rep"))),
 		el("p", { class: "text-sm text-muted-foreground" }, () => `status: ${s.status || "—"}`)

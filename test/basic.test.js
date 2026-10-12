@@ -133,3 +133,10 @@ test("Avatar swaps fallback for image on load", () => {
 	assert.equal(img.hidden, false);
 	assert.equal(fallback.hidden, true);
 });
+
+test("a11y: AvatarImage defaults alt to \"\" (decorative); caller alt wins", async () => {
+	const { AvatarImage: Img } = await import("../index.js");
+
+	assert.equal(Img({ src: "x.png" }).getAttribute("alt"), "");
+	assert.equal(Img({ src: "x.png", alt: "Ada" }).getAttribute("alt"), "Ada");
+});

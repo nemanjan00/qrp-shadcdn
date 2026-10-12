@@ -22,7 +22,9 @@ export const AvatarImage = (...args) => {
 	const { props } = parseArgs(args);
 	const [own, rest] = pick(props, ["class"]);
 
-	const img = el("img", Object.assign({ "data-slot": "avatar-image" }, rest, {
+	// alt defaults to "" (decorative): the fallback carries the text, and a
+	// caller's alt — the person's name — wins.
+	const img = el("img", Object.assign({ "data-slot": "avatar-image", alt: "" }, rest, {
 		class: cn("aspect-square size-full", own.class),
 		hidden: true
 	}));

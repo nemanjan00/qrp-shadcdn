@@ -299,3 +299,29 @@ test("ChartSparkline wraps qrp spark", () => {
 	assert.equal(svg.tagName.toLowerCase(), "svg");
 	assert.equal(svg.querySelector("path").getAttribute("stroke"), "var(--color-desktop)");
 });
+
+test("a11y: Resizable group has no aria-orientation (no role); InputOTP input is named", async () => {
+	const { ResizablePanelGroup: G, ResizablePanel: P, InputOTP: O, InputOTPGroup: OG, InputOTPSlot: OS } = await import("../index.js");
+	const group = G({ direction: "vertical" }, P("a"), P("b"));
+
+	assert.equal(group.hasAttribute("aria-orientation"), false);
+	assert.equal(group.dataset.panelGroupDirection, "vertical");
+	assert.ok(group.className.includes("data-[panel-group-direction=vertical]:flex-col"));
+
+	const otp = O({ maxLength: 2 }, OG(OS({ index: 0 }), OS({ index: 1 })));
+
+	assert.equal(otp.querySelector("input").getAttribute("aria-label"), "One-time code");
+	assert.equal(O({ maxLength: 2, "aria-label": "SMS code" }, OG(OS({ index: 0 }))).querySelector("input").getAttribute("aria-label"), "SMS code", "caller wins");
+});
+
+test("a11y: chart surface is named from the config labels; caller label wins", async () => {
+	const { ChartContainer: C, BarChart: B, Bar: R } = await import("../index.js");
+	const config = { desktop: { label: "Desktop", color: "red" }, mobile: { label: "Mobile", color: "blue" } };
+	const rows = [{ month: "Jan", desktop: 1, mobile: 2 }];
+	const chart = C({ config }, B({ data: rows }, R({ dataKey: "desktop" }), R({ dataKey: "mobile" })));
+	const named = C({ config }, B({ data: rows, "aria-label": "Visitors" }, R({ dataKey: "desktop" })));
+
+	await new Promise((resolve) => setTimeout(resolve, 5));
+	assert.equal(chart.querySelector("[data-slot=chart-surface]").getAttribute("aria-label"), "Bar chart: Desktop, Mobile");
+	assert.equal(named.querySelector("[data-slot=chart-surface]").getAttribute("aria-label"), "Visitors");
+});

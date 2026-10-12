@@ -52,7 +52,7 @@ demo("Input", () => {
 		field("name", "Name", Input({ id: "name", placeholder: "Your name", bind: [s, "name"] })),
 		el("p", { class: "text-sm text-muted-foreground" }, () => `Hello, ${s.name || "stranger"}.`),
 		Input({ disabled: true, placeholder: "Disabled" }),
-		Input({ "aria-invalid": "true", value: "invalid" })
+		Input({ "aria-invalid": "true", "aria-label": "Invalid example", value: "invalid" })
 	);
 });
 
@@ -61,7 +61,7 @@ demo("Textarea", () => el("div", { class: "grid w-full max-w-sm gap-2" },
 ));
 
 demo("Separator", () => el("div", {},
-	el("div", { class: "space-y-1" }, el("h4", { class: "text-sm leading-none font-medium" }, "Radix Primitives"),
+	el("div", { class: "space-y-1" }, el("h3", { class: "text-sm leading-none font-medium" }, "Radix Primitives"),
 		el("p", { class: "text-sm text-muted-foreground" }, "An open-source UI component library.")),
 	Separator({ class: "my-4" }),
 	el("div", { class: "flex h-5 items-center space-x-4 text-sm" },
@@ -86,12 +86,12 @@ demo("Progress", () => {
 
 	setTimeout(() => { s.value = 66; }, 500);
 
-	return Progress({ value: () => s.value, class: "w-[60%]" });
+	return Progress({ value: () => s.value, class: "w-[60%]", "aria-label": "Upload progress" });
 });
 
 demo("Avatar", () => el("div", { class: "flex flex-row flex-wrap items-center gap-12" },
 	Avatar(AvatarImage({ src: "https://github.com/shadcn.png", alt: "@shadcn" }), AvatarFallback("CN")),
-	Avatar(AvatarImage({ src: "https://example.invalid/missing.png", alt: "" }), AvatarFallback("ER")),
+	Avatar(AvatarFallback("ER")),
 	AvatarGroup(
 		Avatar(AvatarImage({ src: "https://github.com/shadcn.png", alt: "" }), AvatarFallback("CN")),
 		Avatar(AvatarImage({ src: "https://github.com/leerob.png", alt: "" }), AvatarFallback("LR")),

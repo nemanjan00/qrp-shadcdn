@@ -43,7 +43,7 @@ export const Slider = (...args) => {
 	const { props } = parseArgs(args);
 	const [own, rest] = pick(props, [
 		"class", "value", "bind", "defaultValue", "onValueChange", "onValueCommit", "min", "max", "step",
-		"minStepsBetweenThumbs", "orientation", "inverted", "disabled", "name"
+		"minStepsBetweenThumbs", "orientation", "inverted", "disabled", "name", "aria-label", "aria-labelledby"
 	]);
 	const min = own.min === undefined ? 0 : own.min;
 	const max = own.max === undefined ? 100 : own.max;
@@ -146,9 +146,24 @@ export const Slider = (...args) => {
 		}
 	};
 
+	// Thumbs carry the name (the root has no role): the root's aria-label /
+	// aria-labelledby, and like Radix "Minimum" / "Maximum" for a two-thumb range.
+	const thumbLabel = (index) => {
+		const count = current().length;
+		const part = count === 2 ? ["Minimum", "Maximum"][index] : (count > 2 ? `Value ${index + 1} of ${count}` : null);
+
+		if(own["aria-label"] && part) {
+			return `${own["aria-label"]}, ${part.toLowerCase()}`;
+		}
+
+		return own["aria-label"] || part;
+	};
+
 	const thumb = (index) => el("span", { style: thumbStyle(index) }, el("span", {
 		"data-slot": "slider-thumb",
 		role: "slider",
+		"aria-label": () => thumbLabel(index),
+		"aria-labelledby": own["aria-labelledby"] || null,
 		tabindex: () => (disabled() ? null : "0"),
 		"aria-valuemin": String(min),
 		"aria-valuemax": String(max),

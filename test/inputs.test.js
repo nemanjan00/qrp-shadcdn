@@ -492,3 +492,18 @@ test("RadioGroup: list() items join and leave the group; the tab stop follows", 
 	assert.equal(item("b").tabIndex, -1);
 	group.remove();
 });
+
+test("a11y: Slider thumbs are named — root aria-label, Minimum/Maximum for a range", async () => {
+	const { Slider: S } = await import("../index.js");
+	const one = S({ defaultValue: [50], "aria-label": "Volume" });
+	const range = S({ defaultValue: [20, 80] });
+	const named = S({ defaultValue: [20, 80], "aria-label": "Price" });
+	const labelled = S({ defaultValue: [5], "aria-labelledby": "lbl" });
+	const thumbs = (root) => [...root.querySelectorAll("[role=slider]")];
+
+	assert.equal(thumbs(one)[0].getAttribute("aria-label"), "Volume");
+	assert.deepEqual(thumbs(range).map((t) => t.getAttribute("aria-label")), ["Minimum", "Maximum"]);
+	assert.deepEqual(thumbs(named).map((t) => t.getAttribute("aria-label")), ["Price, minimum", "Price, maximum"]);
+	assert.equal(thumbs(labelled)[0].getAttribute("aria-labelledby"), "lbl");
+	assert.equal(one.hasAttribute("aria-label"), false, "the role-less root doesn't carry the name");
+});

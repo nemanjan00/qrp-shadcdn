@@ -336,7 +336,8 @@ export const CommandSeparator = (...args) => {
 	return el("div", Object.assign({
 		"data-slot": "command-separator",
 		"cmdk-separator": "",
-		role: "separator",
+		// Decorative: a listbox may only own options and groups.
+		role: "none",
 		"data-always-render": own.alwaysRender ? "" : null
 	}, rest, { class: cn("-mx-1 h-px bg-border", own.class) }));
 };

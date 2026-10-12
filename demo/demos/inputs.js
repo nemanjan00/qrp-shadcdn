@@ -43,7 +43,7 @@ demo("Collapsible", () => {
 
 	return Collapsible({ class: "flex w-[350px] flex-col gap-2" },
 		el("div", { class: "flex items-center justify-between gap-4 px-4" },
-			el("h4", { class: "text-sm font-semibold" }, "@peduarte starred 3 repositories"),
+			el("h3", { class: "text-sm font-semibold" }, "@peduarte starred 3 repositories"),
 			CollapsibleTrigger(Button({ variant: "ghost", size: "icon", class: "size-8" }, ChevronsUpDownIcon(), el("span", { class: "sr-only" }, "Toggle")))),
 		repo("@radix-ui/primitives"),
 		CollapsibleContent({ class: "flex flex-col gap-2" }, repo("@radix-ui/colors"), repo("@stitches/react"))
@@ -95,10 +95,10 @@ demo("Slider", () => {
 	const s = state({ price: [200, 800] });
 
 	return el("div", { class: "flex w-full max-w-md flex-col gap-8" },
-		Slider({ defaultValue: [50], max: 100, step: 1, class: "w-[60%]" }),
+		Slider({ defaultValue: [50], max: 100, step: 1, class: "w-[60%]", "aria-label": "Volume" }),
 		el("div", { class: "grid gap-3" },
 			el("div", { class: "flex justify-between text-sm" }, Label("Price range"), el("span", { class: "text-muted-foreground" }, () => `$${s.price[0]} – $${s.price[1]}`)),
-			Slider({ value: [s, "price"], min: 0, max: 1000, step: 10 })),
-		el("div", { class: "flex h-40 gap-8" }, Slider({ defaultValue: [50], orientation: "vertical" }), Slider({ defaultValue: [25, 75], orientation: "vertical" }))
+			Slider({ value: [s, "price"], min: 0, max: 1000, step: 10, "aria-label": "Price" })),
+		el("div", { class: "flex h-40 gap-8" }, Slider({ defaultValue: [50], orientation: "vertical", "aria-label": "Level" }), Slider({ defaultValue: [25, 75], orientation: "vertical" }))
 	);
 });

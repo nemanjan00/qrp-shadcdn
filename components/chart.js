@@ -149,7 +149,7 @@ export const ChartContainer = (...args) => {
 	const chartId = `chart-${own.id || uid("c").replace(/[^a-z0-9-]/gi, "")}`;
 
 	const container = el("div", Object.assign({ "data-slot": "chart", "data-chart": chartId }, rest, {
-		class: cn("flex aspect-video justify-center text-xs", own.class)
+		class: cn("flex aspect-video min-w-0 justify-center text-xs", own.class)
 	}), ChartStyle({ id: chartId, config: own.config }), ...children);
 
 	configs.set(container, own.config || {});
@@ -506,7 +506,7 @@ const seriesMarks = (layout, rows, kind, entry, index) => {
 
 const makeChart = (kind) => (...args) => {
 	const { props, children } = parseArgs(args);
-	const [own, rest] = pick(props, ["data", "margin", "class", "accessibilityLayer", "title"]);
+	const [own, rest] = pick(props, ["data", "margin", "class", "accessibilityLayer", "title", "aria-label"]);
 	const parts = collect(children);
 	const margin = Object.assign({}, MARGIN, own.margin);
 	const rows = () => read(own.data) || [];
@@ -518,6 +518,15 @@ const makeChart = (kind) => (...args) => {
 	const tooltip = parts.tooltip ? parts.tooltip.props : null;
 	const legend = parts.legend ? parts.legend.props : null;
 	let root = null;
+	const KIND_NAMES = { bar: "Bar chart", line: "Line chart", area: "Area chart" };
+	const defaultLabel = () => {
+		meta.version;
+
+		const config = root ? configOf(root) : {};
+		const names = parts.series.map((series) => (config[series.props.dataKey] && config[series.props.dataKey].label) || series.props.dataKey);
+
+		return names.length ? `${KIND_NAMES[kind]}: ${names.join(", ")}` : KIND_NAMES[kind];
+	};
 	const gridProps = parts.grid ? parts.grid.props : null;
 	const xProps = parts.xaxis ? parts.xaxis.props : null;
 	const yProps = parts.yaxis ? parts.yaxis.props : null;
@@ -610,11 +619,15 @@ const makeChart = (kind) => (...args) => {
 	const svg = el("svg", {
 		"data-slot": "chart-surface",
 		role: "img",
-		"aria-label": own.title || null,
+		// role="img" needs a name: the caller's aria-label / title, else e.g.
+		// "Bar chart: Desktop, Mobile" from the series' config labels.
+		"aria-label": () => own["aria-label"] || own.title || defaultLabel(),
 		tabindex: own.accessibilityLayer ? "0" : null,
 		width: () => size.width,
 		height: () => size.height,
-		class: "overflow-visible outline-hidden",
+		// Absolute: the plot box takes its size from the container, never from
+		// the svg's last measured px width, so it can shrink (and re-measure).
+		class: "absolute inset-0 overflow-visible outline-hidden",
 		onpointermove: (event) => {
 			const rect = svg.getBoundingClientRect();
 			const px = event.clientX - rect.left;
@@ -686,7 +699,7 @@ const makeChart = (kind) => (...args) => {
 	// Bound after construction: the legend renders once before root exists and
 	// again (via the container's refresh) once it can find its config.
 	root = el("div", Object.assign({ "data-slot": "chart-root" }, rest, {
-		class: cn("relative flex h-full w-full flex-col", own.class)
+		class: cn("relative flex h-full w-full min-w-0 flex-col", own.class)
 	}), legend && legend.verticalAlign === "top" ? legendNode : null, surface, legend && legend.verticalAlign !== "top" ? legendNode : null);
 
 	refreshers.set(root, () => { meta.version += 1; });

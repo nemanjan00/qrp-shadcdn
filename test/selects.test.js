@@ -421,3 +421,27 @@ test("forms adapters: selectInput, nativeSelectInput, comboboxInput bind to sett
 	await tick();
 	document.body.replaceChildren();
 });
+
+test("a11y: Select trigger is named by its value unless labelled; Command separator is presentational", async () => {
+	const { Select: S, SelectTrigger: T, SelectValue: V, SelectContent: C, SelectItem: I, CommandSeparator: Sep, Label: L } = await import("../index.js");
+	const host = document.createElement("div");
+
+	document.body.append(host);
+	host.append(S(T(V({ placeholder: "Pick a fruit" })), C(I({ value: "a" }, "Apple"))));
+	host.append(S(T({ "aria-label": "Fruit" }, V({ placeholder: "x" })), C(I({ value: "a" }, "Apple"))));
+	host.append(L({ for: "fruit-trigger" }, "Fruit"), S(T({ id: "fruit-trigger" }, V({ placeholder: "y" })), C(I({ value: "a" }, "Apple"))));
+	await new Promise((resolve) => queueMicrotask(resolve));
+
+	const [plain, labelled, forLabel] = [...host.querySelectorAll("[data-slot=select-trigger]")];
+	const valueId = plain.getAttribute("aria-labelledby");
+
+	assert.ok(valueId && document.getElementById(valueId).textContent === "Pick a fruit");
+	assert.equal(labelled.hasAttribute("aria-labelledby"), false, "caller aria-label wins");
+	assert.equal(labelled.getAttribute("aria-label"), "Fruit");
+	if(forLabel.labels) {
+		assert.equal(forLabel.hasAttribute("aria-labelledby"), false, "a <label for> wins");
+	}
+
+	assert.equal(Sep().getAttribute("role"), "none");
+	host.remove();
+});

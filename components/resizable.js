@@ -88,8 +88,7 @@ export const ResizablePanelGroup = (...args) => {
 	const group = el("div", Object.assign({
 		"data-slot": "resizable-panel-group",
 		"data-panel-group-direction": orientation,
-		"aria-orientation": orientation,
-		class: cn("flex h-full w-full aria-[orientation=vertical]:flex-col", own.class)
+		class: cn("flex h-full w-full data-[panel-group-direction=vertical]:flex-col", own.class)
 	}, rest), ...children);
 
 	const panels = [...group.children].filter((node) => limits.has(node));

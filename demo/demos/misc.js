@@ -28,7 +28,7 @@ demo("Breadcrumb", () => Breadcrumb(BreadcrumbList(
 
 demo("Pagination", () => {
 	const page = state({ n: 2 });
-	const link = (n) => PaginationItem(PaginationLink({
+	const link = (n, cls) => PaginationItem({ class: cls }, PaginationLink({
 		href: "#",
 		isActive: () => page.n === n,
 		onclick: (event) => { event.preventDefault(); page.n = n; }
@@ -55,13 +55,14 @@ demo("Pagination", () => {
 	return el("div", { class: "grid gap-6" },
 		Pagination(PaginationContent(
 			PaginationItem(PaginationPrevious({ href: "#", onclick: (event) => { event.preventDefault(); page.n = Math.max(1, page.n - 1); } })),
-			link(1), link(2), link(3),
+			// The narrowest phones (320px) can't fit three numbers + both arrows.
+			link(1), link(2), link(3, "max-[359px]:hidden"),
 			PaginationItem(PaginationEllipsis()),
 			PaginationItem(PaginationNext({ href: "#", onclick: (event) => { event.preventDefault(); page.n = Math.min(3, page.n + 1); } }))
 		)),
 		el("div", { class: "grid gap-2 text-center" },
 			el("p", { class: "text-sm text-muted-foreground" }, () => `PaginationFor(pager) — page ${grid.page.index + 1} of ${grid.pageCount()}`),
-			PaginationFor(grid)
+			PaginationFor(grid, { span: 3 })
 		)
 	);
 });
@@ -98,7 +99,8 @@ demo("Item", () => el("div", { class: "flex w-full max-w-md flex-col gap-6" },
 ));
 
 demo("Button Group", () => el("div", { class: "flex flex-col items-start gap-6" },
-	ButtonGroup(
+	// flex-wrap: the full toolbar is ~325px, wider than a 320px phone's content box.
+	ButtonGroup({ class: "flex-wrap" },
 		ButtonGroup(Button({ variant: "outline", size: "icon", "aria-label": "Go Back" }, "←")),
 		ButtonGroup(Button({ variant: "outline" }, "Archive"), Button({ variant: "outline" }, "Report")),
 		ButtonGroup(Button({ variant: "outline" }, "Snooze"), Button({ variant: "outline", size: "icon", "aria-label": "More" }, "⋯"))

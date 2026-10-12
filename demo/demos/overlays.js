@@ -62,7 +62,7 @@ demo("Drawer", () => {
 demo("Popover", () => Popover(
 	PopoverTrigger(Button({ variant: "outline" }, "Open popover")),
 	PopoverContent({ class: "w-80" }, el("div", { class: "grid gap-4" },
-		el("div", { class: "space-y-2" }, el("h4", { class: "leading-none font-medium" }, "Dimensions"),
+		el("div", { class: "space-y-2" }, el("h3", { class: "leading-none font-medium" }, "Dimensions"),
 			el("p", { class: "text-sm text-muted-foreground" }, "Set the dimensions for the layer.")),
 		el("div", { class: "grid gap-2" }, ...[["width", "100%"], ["maxWidth", "300px"], ["height", "25px"]].map(([id, value]) =>
 			el("div", { class: "grid grid-cols-3 items-center gap-4" }, Label({ for: id }, id), Input({ id, value, class: "col-span-2 h-8" }))))
@@ -78,7 +78,7 @@ demo("Hover Card", () => HoverCard(
 	HoverCardTrigger(Button({ variant: "link" }, "@nextjs")),
 	HoverCardContent({ class: "w-80" }, el("div", { class: "flex justify-between gap-4" },
 		Avatar(AvatarImage({ src: "https://github.com/vercel.png" }), AvatarFallback("VC")),
-		el("div", { class: "space-y-1" }, el("h4", { class: "text-sm font-semibold" }, "@nextjs"),
+		el("div", { class: "space-y-1" }, el("h3", { class: "text-sm font-semibold" }, "@nextjs"),
 			el("p", { class: "text-sm" }, "The React Framework – created and maintained by @vercel."),
 			el("div", { class: "text-xs text-muted-foreground" }, "Joined December 2021"))
 	))

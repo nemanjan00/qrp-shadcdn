@@ -43,7 +43,7 @@ const chartConfig = {
 	mobile: { label: "Mobile", color: "var(--chart-2)" }
 };
 
-const chartCard = (title, description, chart) => Card({ class: "w-full max-w-md" },
+const chartCard = (title, description, chart) => Card({ class: "w-full min-w-0 max-w-md" },
 	CardHeader(CardTitle(title), CardDescription(description)),
 	CardContent(chart));
 
@@ -91,7 +91,7 @@ demo("Chart", () => el("div", { class: "grid w-full gap-6 md:grid-cols-2" },
 			} }, "Add month")))
 ));
 
-demo("Carousel", () => el("div", { class: "flex flex-col items-center gap-16 px-12" },
+demo("Carousel", () => el("div", { class: "flex w-full min-w-0 flex-col items-center gap-16 px-12" },
 	Carousel({ class: "w-full max-w-xs" },
 		CarouselContent(...[1, 2, 3, 4, 5].map((n) => CarouselItem(el("div", { class: "p-1" },
 			Card(CardContent({ class: "flex aspect-square items-center justify-center p-6" }, el("span", { class: "text-4xl font-semibold" }, String(n)))))))),
@@ -115,11 +115,11 @@ demo("Scroll Area", () => {
 	const tags = Array.from({ length: 50 }, (_, i) => `v1.2.0-beta.${50 - i}`);
 	const works = ["Ornella Binni", "Tom Byrom", "Vladimir Malyavko"];
 
-	return el("div", { class: "flex flex-wrap items-start gap-8" },
+	return el("div", { class: "flex w-full min-w-0 flex-wrap items-start justify-center gap-8" },
 		ScrollArea({ class: "h-72 w-48 rounded-md border" }, el("div", { class: "p-4" },
-			el("h4", { class: "mb-4 text-sm leading-none font-medium" }, "Tags"),
+			el("h3", { class: "mb-4 text-sm leading-none font-medium" }, "Tags"),
 			...tags.flatMap((tag) => [el("div", { class: "text-sm" }, tag), Separator({ class: "my-2" })]))),
-		ScrollArea({ class: "w-96 rounded-md border whitespace-nowrap" },
+		ScrollArea({ class: "w-full max-w-96 rounded-md border whitespace-nowrap" },
 			el("div", { class: "flex w-max space-x-4 p-4" }, ...works.map((artist) => el("figure", { class: "shrink-0" },
 				el("div", { class: "flex h-[200px] w-[150px] items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground" }, "Photo"),
 				el("figcaption", { class: "pt-2 text-xs text-muted-foreground" }, "Photo by ", el("span", { class: "font-semibold text-foreground" }, artist))))),

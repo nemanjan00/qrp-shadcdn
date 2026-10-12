@@ -4,7 +4,7 @@
  * https://ui.shadcn.com/docs/components/item
  */
 
-import { part, parseArgs, cn, variants } from "../utils/index.js";
+import { part, parseArgs, cn, variants, watchTree } from "../utils/index.js";
 import { Separator } from "./separator.js";
 
 // shadcn's base has `border-transparent`, which its outline variant overrides
@@ -36,7 +36,41 @@ export const itemMediaVariants = variants("flex shrink-0 items-center justify-ce
 	defaultVariants: { variant: "default" }
 });
 
-export const ItemGroup = part("div", "item-group", "group/item-group flex flex-col", { attrs: { role: "list" } });
+const ItemGroupBase = part("div", "item-group", "group/item-group flex flex-col", { attrs: { role: "list" } });
+
+// A role="list" may only own list items: Items become listitems, separators
+// between them presentational. An Item rendered as a link or button keeps its
+// own role — then the group drops role="list" rather than hide the link.
+// Children added later (list()/when()) are marked as they appear — attributes
+// only, never the child list.
+const INTERACTIVE = new Set(["A", "BUTTON"]);
+
+const markListChildren = (group) => {
+	const children = [...group.children];
+	const items = children.filter((child) => child.getAttribute("data-slot") === "item");
+	const interactive = items.some((child) => INTERACTIVE.has(child.tagName) || (child.hasAttribute("role") && child.getAttribute("role") !== "listitem"));
+
+	if(interactive) {
+		if(group.getAttribute("role") === "list") {
+			group.removeAttribute("role");
+		}
+
+		return;
+	}
+
+	items.filter((child) => !child.hasAttribute("role")).forEach((child) => child.setAttribute("role", "listitem"));
+	children
+		.filter((child) => child.getAttribute("data-slot") === "item-separator" && child.getAttribute("role") !== "none")
+		.forEach((child) => child.setAttribute("role", "none"));
+};
+
+export const ItemGroup = (...args) => {
+	const group = ItemGroupBase(...args);
+
+	watchTree(group, () => markListChildren(group));
+
+	return group;
+};
 
 export const ItemSeparator = (...args) => {
 	const { props } = parseArgs(args);

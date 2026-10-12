@@ -7,6 +7,22 @@ can land in a minor — they're marked ⚠️ **BREAKING**. Newest first.
 
 _(nothing yet)_
 
+## 0.2.2
+
+Fixes for regressions in 0.2.1's modal changes:
+
+- **Popups inside a modal scroll again.** A Select (or any popup) opened in a
+  Dialog is portaled to `<body>`, outside the dialog, and 0.2.1's scroll lock
+  blocked wheel/touch over it — a long Select list in a Dialog couldn't scroll.
+  Scrolling is now allowed over every open layer's content (Radix's "shards");
+  the backdrop and the page behind stay locked.
+- **Toasts stay usable while a modal is open.** 0.2.1 made the Toaster inert
+  with the rest of the page, so a "Saved" toast fired from a dialog couldn't be
+  clicked or announced. The inert sweep now walks the tree like Radix's
+  `hideOthers` and keeps `[data-qs-keep]` regions (Sonner's region and the
+  legacy viewport carry it; add it to anything that must stay live).
+- **Clicking a toast no longer dismisses the dialog** it came from.
+
 ## 0.2.1
 
 - **Fix: reopening an overlay during its exit animation broke the page.** The

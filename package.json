@@ -4,26 +4,29 @@
 	"description": "shadcn/ui components for qrp, bundled as one ESM module and served over CDN. Prebuilt CSS, no build step on your end.",
 	"type": "module",
 	"license": "MIT",
-	"main": "./dist/qrp-shadcdn.js",
-	"module": "./dist/qrp-shadcdn.js",
+	"main": "./index.js",
+	"module": "./index.js",
 	"types": "./index.d.ts",
 	"exports": {
 		".": {
 			"types": "./index.d.ts",
-			"default": "./dist/qrp-shadcdn.js"
+			"default": "./index.js"
 		},
 		"./qrp-shadcdn.css": "./dist/qrp-shadcdn.css",
 		"./theme.css": "./styles/theme.css",
-		"./package.json": "./package.json"
+		"./package.json": "./package.json",
+		"./bundle": "./dist/qrp-shadcdn.js"
 	},
 	"sideEffects": [
 		"**/*.css"
 	],
 	"files": [
-		"dist",
+		"index.js",
 		"index.d.ts",
-		"components/*.d.ts",
-		"utils/*.d.ts",
+		"components/*.js",
+		"utils/*.js",
+		"icons/*.js",
+		"dist",
 		"styles/theme.css",
 		"README.md"
 	],
@@ -43,7 +46,7 @@
 		"tailwind"
 	],
 	"scripts": {
-		"test": "node --test 'test/*.test.js'",
+		"test": "NODE_OPTIONS=--max-old-space-size=1024 node --test --test-timeout=30000 'test/*.test.js'",
 		"build": "node bin/build.js",
 		"lint": "eslint index.js components utils icons bin test",
 		"prepack": "node bin/build.js",

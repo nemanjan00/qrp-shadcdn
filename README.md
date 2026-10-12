@@ -9,7 +9,7 @@ bundled as **one ES module** and served over a CDN — the qrp take on
 
 <script type="module">
 	import { state, mount, el, Button, Card, CardHeader, CardTitle, CardContent, Input }
-		from "https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/+esm";
+		from "https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.js/+esm";
 
 	const s = state({ name: "" });
 
@@ -28,21 +28,25 @@ the shadcn look.
 
 ## Install
 
-### CDN (like shadcdn)
+### CDN (like shadcdn) — for prototyping
 
 One script import, one stylesheet:
 
 ```
-https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/+esm
+https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.js/+esm
 https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.css
 ```
+
+Use the `dist/qrp-shadcdn.js/+esm` path, not the package root: the root is the
+unbundled source for bundlers. The CDN bundle carries every component — fine for
+a prototype; for a real app, install from npm and let your bundler tree-shake.
 
 **Import qrp from the same URL.** The bundle re-exports qrp's core (`state`,
 `effect`, `el`, `mount`, `list`, `when`, `router`, …) and `html`, so a page can
 take everything from this one module. That matters: reactivity lives in qrp's
 module state, and a second copy of qrp (from another CDN URL) would not see the
 components' bindings. Pin a version in production
-(`…/qrp-shadcdn@0.1.0/+esm`).
+(`…/qrp-shadcdn@0.1.0/dist/qrp-shadcdn.js/+esm`).
 
 ### npm + a bundler
 
@@ -56,11 +60,15 @@ import { Button, Dialog } from "@nemanjan00/qrp-shadcdn";
 import "@nemanjan00/qrp-shadcdn/qrp-shadcdn.css";
 ```
 
-qrp is a peer dependency, so your app and the components share one copy.
+qrp is a peer dependency, so your app and the components share one copy. The
+package entry is the plain ES-module source — one file per component, no side
+effects — so the bundler keeps only what you import: a page using just `Button`
+ships about 3.5 KB gzipped (qrp included), one with a `Dialog` about 7.7 KB.
 
 ### Self-hosted, no tooling
 
-Copy `dist/qrp-shadcdn.js` and qrp's `dist/` next to your page and map the names:
+Copy `dist/qrp-shadcdn.js` (everything, in one file) and qrp's `dist/` next to
+your page and map the names:
 
 ```html
 <script type="importmap">

@@ -23,7 +23,7 @@ import { el, effect, untracked, onDispose } from "@nemanjan00/qrp";
 import { parseArgs, pick, cn, controllable, fragmentOf, splitContent, watchTree } from "./index.js";
 import { layerWhen } from "./layer.js";
 import { placeContent } from "./popup.js";
-import { CheckIcon, CircleIcon, ChevronRightIcon } from "../icons/index.js";
+import { CheckIcon, CircleIcon, ChevronRightIcon, MinusIcon } from "../icons/index.js";
 
 const TYPEAHEAD_RESET = 500;
 const SUB_CLOSE_DELAY = 150;
@@ -405,15 +405,20 @@ export const menuParts = (prefix, classes, contentDefaults = {}) => {
 		const { props, children } = parseArgs(args);
 		const [own, rest] = pick(props, ITEM_KEYS.concat(["checked", "defaultChecked", "onCheckedChange"]));
 		const checked = controllable(own.checked === undefined ? own.defaultChecked : own.checked, false, own.onCheckedChange);
+		// A check when checked, a minus when "indeterminate" (as Checkbox does).
 		const icon = CheckIcon({ class: classes.checkIcon });
+		const mixedIcon = MinusIcon({ class: classes.checkIcon });
 		const item = el("div", Object.assign(itemAttrs(own, "menuitemcheckbox", `${prefix}-checkbox-item`), rest, {
 			class: cn(classes.checkboxItem, own.class),
 			"aria-checked": () => String(checked.get() === "indeterminate" ? "mixed" : Boolean(checked.get())),
 			"data-state": () => checkedState(checked.get())
-		}), indicator(icon), ...children);
+		}), indicator([icon, mixedIcon]), ...children);
 
 		effect(() => {
-			icon.style.display = checked.get() ? "" : "none";
+			const current = checkedState(checked.get());
+
+			icon.style.display = current === "checked" ? "" : "none";
+			mixedIcon.style.display = current === "indeterminate" ? "" : "none";
 		});
 
 		if(own.onSelect) {

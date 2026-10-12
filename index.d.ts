@@ -1001,8 +1001,8 @@ export type DatePickerProps = {
 	content?: PlacementProps & BaseProps;
 	class?: ClassValue;
 } & (
-	| { mode?: "single"; value?: Controllable<Date | undefined>; onValueChange?: (value: Date | undefined) => void }
-	| { mode: "range"; value?: Controllable<DateRange | undefined>; onValueChange?: (value: DateRange | undefined) => void }
+	| { mode?: "single"; value?: Controllable<Date | undefined>; defaultValue?: Date; onValueChange?: (value: Date | undefined) => void }
+	| { mode: "range"; value?: Controllable<DateRange | undefined>; defaultValue?: DateRange; onValueChange?: (value: DateRange | undefined) => void }
 );
 export function DatePicker(props?: DatePickerProps): DocumentFragment;
 /** The trigger label for a picked value ("" when nothing is selected). */
@@ -1132,6 +1132,9 @@ export const ScrollBar: QsComponent<{ orientation?: Orientation }>;
 export const InputOTP: QsComponent<{
 	maxLength: number;
 	value?: Controllable<string>;
+	defaultValue?: string;
+	onValueChange?: (value: string) => void;
+	/** Alias of onValueChange (input-otp's name). */
 	onChange?: (value: string) => void;
 	onComplete?: (value: string) => void;
 	pattern?: string | RegExp;

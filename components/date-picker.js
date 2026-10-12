@@ -60,9 +60,9 @@ export const formatPicked = (mode, value, locale) => {
  */
 export const DatePicker = (...args) => {
 	const { props } = parseArgs(args);
-	const [own, rest] = pick(props, ["mode", "value", "onValueChange", "placeholder", "locale", "calendar", "content", "class"]);
+	const [own, rest] = pick(props, ["mode", "value", "defaultValue", "onValueChange", "placeholder", "locale", "calendar", "content", "class"]);
 	const mode = own.mode || "single";
-	const value = controllable(own.value, undefined, own.onValueChange);
+	const value = controllable(own.value === undefined ? own.defaultValue : own.value, undefined, own.onValueChange);
 	const popover = state({ open: false });
 	const label = () => formatPicked(mode, value.get(), own.locale);
 

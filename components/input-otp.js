@@ -58,7 +58,8 @@ const toRegExp = (pattern) => {
  * @param {object} props
  * @param {number} props.maxLength number of characters
  * @param {*} [props.value] string; value, thunk, or `[state, "key"]`
- * @param {Function} [props.onChange] (value) => void
+ * @param {Function} [props.onValueChange] (value) => void — like every other control
+ * @param {Function} [props.onChange] alias of onValueChange (input-otp's name)
  * @param {Function} [props.onComplete] (value) => void, once all slots are filled
  * @param {string|RegExp} [props.pattern] allowed full value, e.g. REGEXP_ONLY_DIGITS
  * @param {boolean} [props.disabled]
@@ -68,10 +69,11 @@ const toRegExp = (pattern) => {
  */
 export const InputOTP = (...args) => {
 	const { props, children } = parseArgs(args);
-	const [own, rest] = pick(props, ["maxLength", "value", "onChange", "onComplete", "pattern", "class", "containerClassName", "disabled"]);
+	const [own, rest] = pick(props, ["maxLength", "value", "defaultValue", "onValueChange", "onChange", "onComplete", "pattern", "class", "containerClassName", "disabled"]);
 	const maxLength = own.maxLength || 6;
 	const pattern = toRegExp(own.pattern);
-	const value = controllable(own.value, "", own.onChange);
+	const onValueChange = own.onValueChange || own.onChange;
+	const value = controllable(own.value === undefined ? own.defaultValue : own.value, "", onValueChange);
 	const ui = state({ focused: false });
 	const digits = own.pattern === REGEXP_ONLY_DIGITS;
 

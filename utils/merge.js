@@ -52,7 +52,9 @@ const RULES = [
 	["pt", /^pt-/], ["pr", /^pr-/], ["pb", /^pb-/], ["pl", /^pl-/],
 	["m", /^m-/], ["mx", /^mx-/], ["my", /^my-/], ["ms", /^ms-/], ["me", /^me-/],
 	["mt", /^mt-/], ["mr", /^mr-/], ["mb", /^mb-/], ["ml", /^ml-/],
-	["inset", /^inset-[^xy]/], ["inset-x", /^inset-x-/], ["inset-y", /^inset-y-/],
+	["inset-x", /^inset-x-/], ["inset-y", /^inset-y-/],
+	// inset-shadow-* / inset-ring-* are Tailwind v4 shadow utilities, not insets.
+	["inset", /^inset-(?!shadow|ring)/],
 	["top", /^top-/], ["right", /^right-/], ["bottom", /^bottom-/], ["left", /^left-/],
 	["z", /^z-/],
 	["order", /^order-/],
@@ -60,11 +62,13 @@ const RULES = [
 	["overflow-y", /^overflow-y-/],
 	["overflow", /^overflow-/],
 	["font-size", new RegExp(`^text-(${SIZES})(/.+)?$`)],
+	["font-size", /^text-\[(length:|(\d|\.)[\d.]*(px|r?em|%|vw|vh|ch|ex|lh)\]|calc\(|clamp\()/],
 	["text-align", /^text-(left|center|right|justify|start|end)$/],
 	["text-wrap", /^text-(wrap|nowrap|balance|pretty)$/],
 	["text-overflow", /^text-(ellipsis|clip)$/],
 	["text-color", /^text-/],
 	["font-weight", /^font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)$/],
+	["font-weight", /^font-\[(number:|\d+\])/],
 	["font-family", /^font-/],
 	["leading", /^leading-/],
 	["tracking", /^tracking-/],
@@ -75,12 +79,20 @@ const RULES = [
 	["border-w-t", /^border-t(-\d+)?$/], ["border-w-r", /^border-r(-\d+)?$/],
 	["border-w-b", /^border-b(-\d+)?$/], ["border-w-l", /^border-l(-\d+)?$/],
 	["border-w", /^border(-\d+)?$/],
+	["border-w", /^border-\[(length:|(\d|\.)[\d.]*(px|r?em)\])/],
 	["border-style", /^border-(solid|dashed|dotted|double|hidden|none)$/],
 	["border-color", /^border-/],
+	["rounded-tl", /^rounded-tl(-|$)/], ["rounded-tr", /^rounded-tr(-|$)/],
+	["rounded-bl", /^rounded-bl(-|$)/], ["rounded-br", /^rounded-br(-|$)/],
+	["rounded-ss", /^rounded-ss(-|$)/], ["rounded-se", /^rounded-se(-|$)/],
+	["rounded-es", /^rounded-es(-|$)/], ["rounded-ee", /^rounded-ee(-|$)/],
 	["rounded-t", /^rounded-t(-|$)/], ["rounded-r", /^rounded-r(-|$)/],
 	["rounded-b", /^rounded-b(-|$)/], ["rounded-l", /^rounded-l(-|$)/],
+	["rounded-s", /^rounded-s(-|$)/], ["rounded-e", /^rounded-e(-|$)/],
 	["rounded", /^rounded(-|$)/],
-	["shadow", /^shadow(-|$)/],
+	["shadow", /^shadow(-(2xs|xs|sm|md|lg|xl|2xl|none|inner))?$/],
+	["shadow", /^shadow-\[(shadow:|\d|inset|var\(--shadow)/],
+	["shadow-color", /^shadow-/],
 	["opacity", /^opacity-/],
 	["cursor", /^cursor-/],
 	["pointer-events", /^pointer-events-/],
@@ -107,7 +119,14 @@ const COVERS = {
 	"border-w": ["border-w-x", "border-w-y", "border-w-t", "border-w-r", "border-w-b", "border-w-l"],
 	"border-w-x": ["border-w-r", "border-w-l"],
 	"border-w-y": ["border-w-t", "border-w-b"],
-	rounded: ["rounded-t", "rounded-r", "rounded-b", "rounded-l"]
+	rounded: ["rounded-t", "rounded-r", "rounded-b", "rounded-l", "rounded-s", "rounded-e",
+		"rounded-tl", "rounded-tr", "rounded-bl", "rounded-br", "rounded-ss", "rounded-se", "rounded-es", "rounded-ee"],
+	"rounded-t": ["rounded-tl", "rounded-tr"],
+	"rounded-r": ["rounded-tr", "rounded-br"],
+	"rounded-b": ["rounded-bl", "rounded-br"],
+	"rounded-l": ["rounded-tl", "rounded-bl"],
+	"rounded-s": ["rounded-ss", "rounded-es"],
+	"rounded-e": ["rounded-se", "rounded-ee"]
 };
 
 /**
@@ -139,6 +158,28 @@ const groupOf = (utility) => {
 };
 
 /**
+ * The variant part of the conflict key: order-insensitive (`hover:md:` equals
+ * `md:hover:`), except that arbitrary variants (`[&>svg]:`) keep their place —
+ * the same rule tailwind-merge uses. `!` (important) is part of the key, so an
+ * important class and a plain one don't override each other.
+ */
+const variantKey = (variants, utility) => {
+	const parts = variants.split(/:(?![^[]*\])/).filter(Boolean);
+	const runs = parts.reduce((acc, part) => {
+		if(part.startsWith("[")) {
+			acc.push([part], []);
+		} else {
+			acc[acc.length - 1].push(part);
+		}
+
+		return acc;
+	}, [[]]);
+	const important = /^!|!$/.test(utility) ? "!" : "";
+
+	return runs.map((run) => (run[0] && run[0].startsWith("[") ? run : run.slice().sort())).flat().join(":") + important;
+};
+
+/**
  * Resolve conflicts in a space-separated class string: the last class of a
  * group wins (per variant prefix), shorthands remove the longhands they cover.
  *
@@ -151,7 +192,7 @@ export const mergeClasses = (classes) => {
 		const { variants, utility } = splitVariants(cls);
 		const group = groupOf(utility);
 
-		return group ? { variants, group } : null;
+		return group ? { variants: variantKey(variants, utility), group } : null;
 	});
 
 	const kept = tokens.filter((cls, index) => {

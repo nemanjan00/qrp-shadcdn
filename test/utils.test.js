@@ -108,3 +108,23 @@ test("cn resolves Tailwind conflicts last-wins, per variant prefix", () => {
 	assert.equal(cn("-mt-2", "mt-4"), "mt-4");
 	assert.equal(cn("foo bar", "foo"), "bar foo", "duplicates collapse, unknown classes kept");
 });
+
+test("merge: corners, arbitrary values, shadow color, inset-shadow, important and variant order", () => {
+	[
+		["rounded-md rounded-tl-none", "rounded-md rounded-tl-none"],
+		["rounded-tl-none rounded-md", "rounded-md"],
+		["rounded-tl-none rounded-t-lg", "rounded-t-lg"],
+		["text-[13px] text-muted-foreground", "text-[13px] text-muted-foreground"],
+		["text-sm text-[13px]", "text-[13px]"],
+		["text-[#fff] text-red-500", "text-red-500"],
+		["font-[500] font-mono", "font-[500] font-mono"],
+		["border-[3px] border-input", "border-[3px] border-input"],
+		["shadow-sm shadow-black/10", "shadow-sm shadow-black/10"],
+		["shadow-sm shadow-lg", "shadow-lg"],
+		["inset-0 inset-shadow-sm", "inset-0 inset-shadow-sm"],
+		["p-4! p-2", "p-4! p-2"],
+		["p-4! p-2!", "p-2!"],
+		["hover:md:p-2 md:hover:p-4", "md:hover:p-4"],
+		["[&>svg]:hover:p-2 hover:[&>svg]:p-4", "[&>svg]:hover:p-2 hover:[&>svg]:p-4"]
+	].forEach(([input, expected]) => assert.equal(cn(input), expected, input));
+});

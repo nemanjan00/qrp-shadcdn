@@ -10,7 +10,7 @@
  *               driven by a thunk — the qrp take on React's controlled props.
  */
 
-import { el, state, renderable } from "@nemanjan00/qrp";
+import { el, state, effect, renderable } from "@nemanjan00/qrp";
 
 let classMerge = (classes) => classes;
 
@@ -349,3 +349,135 @@ export const animateOut = (node) => new Promise((resolve) => {
 	// Safety net: a missed animationend must never leave a dead overlay behind.
 	setTimeout(finish, duration * 1000 + 50);
 });
+
+/**
+ * Apply el()-style props to an EXISTING element (the `asChild` merge): `on*`
+ * handlers are added, `class` is appended, thunks bind reactively, anything
+ * else becomes an attribute.
+ *
+ * @param {Element} node
+ * @param {object} props
+ * @returns {Element} node
+ */
+export const applyProps = (node, props) => {
+	Object.keys(props).forEach((key) => {
+		const value = props[key];
+
+		if(value === undefined) {
+			return;
+		}
+
+		if(key.startsWith("on") && typeof value === "function") {
+			node.addEventListener(key.slice(2).toLowerCase(), value);
+			return;
+		}
+
+		if(key === "class") {
+			let previous = [];
+			const apply = (classes) => {
+				const next = flatten(classes).join(" ").split(/\s+/).filter(Boolean);
+
+				node.classList.remove(...previous.filter((cls) => !next.includes(cls)));
+				node.classList.add(...next);
+				previous = next;
+			};
+
+			if(typeof value === "function") {
+				effect(() => apply(value()));
+			} else {
+				apply(value);
+			}
+			return;
+		}
+
+		const setAttribute = (next) => {
+			if(next === null || next === false || next === undefined) {
+				node.removeAttribute(key);
+			} else {
+				node.setAttribute(key, next === true ? "" : next);
+			}
+		};
+
+		if(typeof value === "function") {
+			effect(() => setAttribute(value()));
+		} else {
+			setAttribute(value);
+		}
+	});
+
+	return node;
+};
+
+/**
+ * Factory for parts that wire behavior onto a child — triggers and close
+ * buttons. With a single element child the child itself is marked and returned
+ * (shadcn's `asChild`, the default here): `DialogTrigger(Button("Open"))` gives
+ * back that Button. Otherwise the children are wrapped in `tag`.
+ *
+ * The role is stored in `data-qs-role` so the child keeps its own `data-slot`.
+ *
+ * @param {string} role e.g. "dialog-trigger"
+ * @param {string} [tag] wrapper tag (default "button")
+ * @param {string} [base] wrapper classes
+ * @returns {Function} (props?, ...children) => Element
+ */
+export const roleMarker = (role, tag = "button", base = "") => (...args) => {
+	const { props, children } = parseArgs(args);
+	const only = children.length === 1 && children[0] instanceof Element ? children[0] : null;
+
+	if(only) {
+		applyProps(only, props);
+		only.setAttribute("data-qs-role", role);
+
+		return only;
+	}
+
+	const [own, rest] = pick(props, ["class", "as"]);
+	const wrapperTag = own.as || tag;
+	const defaults = wrapperTag === "button" ? { type: "button" } : {};
+
+	return el(wrapperTag, Object.assign(defaults, { "data-slot": role, "data-qs-role": role }, rest, {
+		class: cn(base, own.class)
+	}), ...children);
+};
+
+/**
+ * Elements carrying a role marker, the root included.
+ *
+ * @param {ParentNode} root
+ * @param {string} role
+ * @returns {Element[]}
+ */
+export const withRole = (root, role) => {
+	const found = [...root.querySelectorAll(`[data-qs-role="${role}"]`)];
+
+	if(root instanceof Element && root.getAttribute("data-qs-role") === role) {
+		found.unshift(root);
+	}
+
+	return found;
+};
+
+/**
+ * Render children into a DocumentFragment through qrp's normalizer, so markers
+ * (list/when) and nested arrays work, and pull out the node with `slot` (the
+ * detached content of an overlay).
+ *
+ * @param {Array} children
+ * @param {string} slot data-slot of the content part
+ * @returns {{ fragment: DocumentFragment, content: Element|null }}
+ */
+export const splitContent = (children, slot) => {
+	const holder = el("div", {}, ...children);
+	const content = [...holder.children].find((node) => node.getAttribute("data-slot") === slot) || null;
+
+	if(content) {
+		content.remove();
+	}
+
+	const fragment = document.createDocumentFragment();
+
+	fragment.append(...holder.childNodes);
+
+	return { fragment, content };
+};

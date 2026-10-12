@@ -28,3 +28,7 @@ export * from "./components/skeleton.js";
 export * from "./components/spinner.js";
 export * from "./components/table.js";
 export * from "./components/textarea.js";
+export * from "./components/alert-dialog.js";
+export * from "./components/dialog.js";
+export * from "./components/drawer.js";
+export * from "./components/sheet.js";

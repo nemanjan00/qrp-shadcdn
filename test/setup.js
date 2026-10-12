@@ -10,7 +10,9 @@ const globals = [
 	"customElements", "IntersectionObserver", "MutationObserver", "matchMedia",
 	"localStorage", "sessionStorage", "history", "location", "navigator",
 	"URL", "URLSearchParams", "BroadcastChannel", "getComputedStyle",
-	"requestAnimationFrame", "cancelAnimationFrame"
+	"requestAnimationFrame", "cancelAnimationFrame",
+	"Element", "SVGElement", "DocumentFragment", "KeyboardEvent", "MouseEvent", "PointerEvent",
+	"FocusEvent", "InputEvent", "HTMLInputElement", "ResizeObserver"
 ];
 
 globalThis.window = window;

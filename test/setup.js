@@ -33,3 +33,8 @@ globals.forEach(name => {
 		});
 	}
 });
+
+
+// Convention: compare DOM nodes with assert.ok(a === b), never assert.equal —
+// a failing equal diffs two happy-dom objects and can eat gigabytes. (npm test
+// caps each test process's heap, so it crashes the file instead of the box.)

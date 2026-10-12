@@ -90,3 +90,21 @@ test("controllable: internal, bound tuple, and driven thunk", () => {
 	assert.equal(s.open, true, "a driven value is only changed by its owner");
 	assert.deepEqual(changes, [true, false]);
 });
+
+test("cn resolves Tailwind conflicts last-wins, per variant prefix", () => {
+	assert.equal(cn("h-9 w-full px-4", "h-8 w-[200px]"), "px-4 h-8 w-[200px]");
+	assert.equal(cn("bg-primary hover:bg-primary/90", "bg-red-500"), "hover:bg-primary/90 bg-red-500");
+	assert.equal(cn("text-sm text-muted-foreground", "text-lg"), "text-muted-foreground text-lg", "size and color are different groups");
+	assert.equal(cn("text-muted-foreground", "text-center"), "text-muted-foreground text-center");
+	assert.equal(cn("border border-input", "border-2 border-destructive"), "border-2 border-destructive");
+	assert.equal(cn("rounded-md", "rounded-t-none"), "rounded-md rounded-t-none", "a longhand after a shorthand refines it");
+	assert.equal(cn("px-4 py-2", "p-0"), "p-0", "a shorthand after longhands replaces them");
+	assert.equal(cn("p-2", "px-4"), "p-2 px-4");
+	assert.equal(cn("flex", "hidden md:flex"), "hidden md:flex");
+	assert.equal(cn("data-[state=open]:bg-accent", "data-[state=open]:bg-muted"), "data-[state=open]:bg-muted");
+	assert.equal(cn("[&_svg:not([class*='size-'])]:size-4", "size-6"), "[&_svg:not([class*='size-'])]:size-4 size-6", "colons inside [] are not variant separators");
+	assert.equal(cn("size-9", "w-12"), "size-9 w-12");
+	assert.equal(cn("w-4 h-4", "size-6"), "size-6");
+	assert.equal(cn("-mt-2", "mt-4"), "mt-4");
+	assert.equal(cn("foo bar", "foo"), "bar foo", "duplicates collapse, unknown classes kept");
+});

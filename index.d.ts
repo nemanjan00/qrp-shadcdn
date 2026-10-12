@@ -78,6 +78,12 @@ export interface QsRoot<P = {}> {
 /** Join classes like clsx; returns a thunk when any input is a thunk. */
 export function cn(...inputs: ClassValue[]): string | (() => string);
 
+/**
+ * The built-in Tailwind conflict resolver `cn`/`variants` use: last class of a
+ * group wins per variant prefix; shorthands replace earlier longhands.
+ */
+export function mergeClasses(classes: string): string;
+
 /** Plug in a class-conflict resolver such as tailwind-merge's `twMerge`; null resets. */
 export function setClassMerge(fn: ((classes: string) => string) | null): void;
 

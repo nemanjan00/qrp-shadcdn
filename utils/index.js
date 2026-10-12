@@ -3,6 +3,7 @@
  *
  * - `cn`        clsx-style class joiner (strings, arrays, `{ cls: bool }`), with
  *               qrp thunks: any function input makes the result a reactive thunk.
+ *               Conflicts resolve last-wins (`cn("h-9", "h-8")` → "h-8").
  * - `variants`  the `cva` equivalent: base + variant maps + defaults → classes.
  * - `parseArgs` the `(props?, ...children)` calling convention of every component.
  * - `part`      factory for the many "styled element with a data-slot" parts.
@@ -11,18 +12,21 @@
  */
 
 import { el, state, effect, renderable } from "@nemanjan00/qrp";
+import { mergeClasses } from "./merge.js";
 
-let classMerge = (classes) => classes;
+export { mergeClasses };
+
+let classMerge = mergeClasses;
 
 /**
- * Plug in a class-conflict resolver, e.g. tailwind-merge's `twMerge`, so a
- * consumer `class` overrides a component default (`w-full` beats `w-fit`).
- * Off by default to keep the bundle dependency-free.
+ * Replace the class-conflict resolver. The built-in one (utils/merge.js) lets a
+ * caller's `class` beat a component default for the common utilities; pass
+ * tailwind-merge's `twMerge` for full fidelity, or null to restore the built-in.
  *
  * @param {Function|null} fn (classString) => classString, null to reset
  */
 export const setClassMerge = (fn) => {
-	classMerge = fn || ((classes) => classes);
+	classMerge = fn || mergeClasses;
 };
 
 const hasThunk = (input) => {

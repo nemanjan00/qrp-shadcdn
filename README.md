@@ -176,9 +176,12 @@ const pill = variants("rounded-full px-3", {
 el("span", { class: pill({ tone: () => s.level }) }, "Status");
 ```
 
-`cn()` joins classes like clsx. It does not resolve Tailwind conflicts — to let a
-`class` override a component default, use Tailwind's important modifier
-(`w-full!`) or plug in tailwind-merge: `setClassMerge(twMerge)`.
+`cn()` joins classes like clsx and resolves Tailwind conflicts the way shadcn's
+tailwind-merge does — the later class wins, so `Button({ class: "w-[200px] h-8" })`
+overrides the button's own width and height. The built-in resolver covers the
+utilities that actually collide (sizing, spacing, colors, typography, borders,
+radius, layout) in ~1 KB; for tailwind-merge's full coverage plug it in with
+`setClassMerge(twMerge)`.
 
 ## Built on qrp, not beside it
 

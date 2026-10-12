@@ -112,7 +112,7 @@ export const hero = (anchors) => el("section", { id: "top", class: "scroll-mt-20
 		el("h1", { id: "hero-title", class: "mx-auto max-w-3xl text-4xl font-bold tracking-tight text-balance sm:text-6xl" },
 			"shadcn/ui, ", el("span", { class: "underline decoration-[#ffb23e] decoration-4 underline-offset-8" }, "without React"), "."),
 		el("p", { class: "mx-auto max-w-2xl text-lg text-balance text-muted-foreground" },
-			"Every shadcn component, rebuilt on qrp: reactivity is a Proxy, the DOM is real, and there's no virtual DOM, no hydration and no build step required. Drop it in with one import, or let your bundler tree-shake it."),
+			"50+ shadcn components, rebuilt on qrp: reactivity is a Proxy, the DOM is real, and there's no virtual DOM, no hydration and no build step required. Drop it in with one import, or let your bundler tree-shake it."),
 		el("div", { class: "flex flex-wrap items-center justify-center gap-3" },
 			Button({ as: "a", href: anchors.components, size: "lg" }, "Browse components", ArrowRightIcon()),
 			Button({ as: "a", href: QRP_SITE, target: "_blank", rel: "noopener", size: "lg", variant: "outline" }, "Meet qrp"),

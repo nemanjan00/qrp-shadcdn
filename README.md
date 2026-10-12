@@ -1,8 +1,15 @@
-# qrp-shadcdn
+# shadcn/ui, without React
 
-[shadcn/ui](https://ui.shadcn.com) components for [qrp](https://github.com/nemanjan00/qrp),
-bundled as **one ES module** and served over a CDN — the qrp take on
-[shadcdn](https://github.com/magicpatterns/shadcdn).
+**qrp-shadcdn** is 50+ [shadcn/ui](https://ui.shadcn.com) components — Dialog,
+Select, Combobox, DataTable, Sidebar, Chart, Sonner and the rest — running on
+[qrp](https://github.com/nemanjan00/qrp), a 5 KB reactive core. Same look, same
+class strings, same composition as shadcn. No React, no virtual DOM, no build
+step required.
+
+**[▶ Live demo](https://qrp-shadcdn.onrender.com/)** ·
+[npm](https://www.npmjs.com/package/@nemanjan00/qrp-shadcdn) ·
+[qrp](https://qrp.nemanja.top/) ·
+[Changelog](CHANGELOG.md)
 
 ```html
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.css">
@@ -23,8 +30,38 @@ bundled as **one ES module** and served over a CDN — the qrp take on
 </script>
 ```
 
-No build step, no React, no Tailwind setup. Real DOM, fine-grained reactivity,
-the shadcn look.
+That is the whole app: one stylesheet, one import, no bundler, no JSX.
+
+## Why without React?
+
+shadcn/ui is the best-looking component set around — and it assumes React,
+Radix and a Tailwind build. For a dashboard, an admin panel or a device UI, that
+is a lot of machinery to pay for. qrp-shadcdn keeps the shadcn look and API and
+drops the machinery:
+
+| | shadcn/ui on React | qrp-shadcdn |
+|---|---|---|
+| Runtime | React + ReactDOM (~45 KB gzip) + Radix | qrp core: **5.0 KB** gzip |
+| An app that uses one `Button` | React's runtime comes along | **~5.5 KB** gzip, qrp included |
+| Build step | required (JSX, Tailwind) | **optional** — a `<script type="module">` works |
+| Change one cell in a 10,000-row table | React 18 reconciles the list: ~800 µs | **~0.8 µs**, exactly 1 DOM node touched |
+| State | `useState`, props, context, re-renders | a `Proxy` — mutate it, the bindings update |
+| Getting it | copy component source in with the CLI | npm (tree-shaken) or one CDN import |
+| Look, class strings, composition | shadcn | **shadcn** — ported from the v4 sources |
+
+Behavior is Radix's, reimplemented on qrp: keyboard navigation, focus trapping
+and restoring, layered dismissal (Escape and outside clicks hit the right layer
+when popups nest), `aria-*` wiring, `data-state` / `data-slot` attributes for
+styling, enter/exit animations, an inert background and scroll lock behind
+modals.
+
+The table numbers are qrp's published measurements (React 18.2 production
+build, keyed + `React.memo`, `flushSync`; see qrp's
+[benchmark notes](https://github.com/nemanjan00/qrp#-performance)); the bundle
+sizes are this package's tree-shake tests.
+
+Built the way [shadcdn](https://github.com/magicpatterns/shadcdn) ships shadcn
+for React — one ES module on a CDN — and, unlike it, tree-shakeable from npm.
 
 ## Install
 
@@ -224,7 +261,7 @@ npm run demo         # build + serve the demo page
 npm run build:site   # self-contained static demo in site/ (render.yaml deploys it)
 ```
 
-Components are ported from the shadcn/ui v4 sources: class strings verbatim,
+Components are ported from the shadcn/ui v4 sources: class strings verbatim (with the `--radix-*` CSS variables renamed to qrp's `--qrp-*`),
 Radix behavior (keyboard, focus, ARIA, `data-state`) reimplemented on qrp. Icons
 are from [lucide](https://lucide.dev) (ISC).
 

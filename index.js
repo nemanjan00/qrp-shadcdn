@@ -32,3 +32,6 @@ export * from "./components/alert-dialog.js";
 export * from "./components/dialog.js";
 export * from "./components/drawer.js";
 export * from "./components/sheet.js";
+export * from "./components/hover-card.js";
+export * from "./components/popover.js";
+export * from "./components/tooltip.js";

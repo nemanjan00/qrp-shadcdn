@@ -184,4 +184,10 @@
 	body {
 		@apply bg-background text-foreground;
 	}
+
+	/* Hold the last exit frame until the node is removed, so a closing overlay
+	   can never snap back to visible between animationend and removal. */
+	[data-state="closed"][class*="animate-out"] {
+		animation-fill-mode: forwards;
+	}
 }

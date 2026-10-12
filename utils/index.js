@@ -330,6 +330,7 @@ export const animateOut = (node) => new Promise((resolve) => {
 	const style = typeof getComputedStyle === "function" ? getComputedStyle(node) : null;
 	const name = style ? style.animationName : "";
 	const duration = style ? parseFloat(style.animationDuration) || 0 : 0;
+	const delay = style ? parseFloat(style.animationDelay) || 0 : 0;
 
 	if(!name || name === "none" || duration === 0) {
 		resolve();
@@ -337,7 +338,12 @@ export const animateOut = (node) => new Promise((resolve) => {
 	}
 
 	let done = false;
-	const finish = () => {
+	const finish = (event) => {
+		// animationend bubbles: a child's animation (a spinner) is not ours.
+		if(event && event.target !== node) {
+			return;
+		}
+
 		if(!done) {
 			done = true;
 			node.removeEventListener("animationend", finish);
@@ -347,7 +353,7 @@ export const animateOut = (node) => new Promise((resolve) => {
 
 	node.addEventListener("animationend", finish);
 	// Safety net: a missed animationend must never leave a dead overlay behind.
-	setTimeout(finish, duration * 1000 + 50);
+	setTimeout(() => finish(), (duration + delay) * 1000 + 50);
 });
 
 /**
@@ -460,24 +466,34 @@ export const withRole = (root, role) => {
 
 /**
  * Render children into a DocumentFragment through qrp's normalizer, so markers
- * (list/when) and nested arrays work, and pull out the node with `slot` (the
- * detached content of an overlay).
+ * (list/when), arrays and thunks all work.
+ *
+ * @param {Array} children
+ * @returns {DocumentFragment}
+ */
+export const fragmentOf = (children) => {
+	const fragment = document.createDocumentFragment();
+
+	fragment.append(...el("div", {}, ...children).childNodes);
+
+	return fragment;
+};
+
+/**
+ * Render children into a fragment and pull out the top-level node with `slot`
+ * (the detached content of an overlay).
  *
  * @param {Array} children
  * @param {string} slot data-slot of the content part
  * @returns {{ fragment: DocumentFragment, content: Element|null }}
  */
 export const splitContent = (children, slot) => {
-	const holder = el("div", {}, ...children);
-	const content = [...holder.children].find((node) => node.getAttribute("data-slot") === slot) || null;
+	const fragment = fragmentOf(children);
+	const content = [...fragment.children].find((node) => node.getAttribute("data-slot") === slot) || null;
 
 	if(content) {
 		content.remove();
 	}
-
-	const fragment = document.createDocumentFragment();
-
-	fragment.append(...holder.childNodes);
 
 	return { fragment, content };
 };

@@ -84,6 +84,29 @@ const unlockScroll = () => {
 	}
 };
 
+const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
+
+/**
+ * Non-modal focus: move focus into the layer, and on release put it back —
+ * but only if it is still inside (the user may have tabbed away on purpose).
+ */
+const moveFocus = (content) => {
+	const previous = document.activeElement;
+	const target = content.querySelector("[data-autofocus]") || content.querySelector(FOCUSABLE) || content;
+
+	if(target === content && !content.hasAttribute("tabindex")) {
+		content.setAttribute("tabindex", "-1");
+	}
+
+	target.focus({ preventScroll: true });
+
+	return () => {
+		if(content.contains(document.activeElement) && previous && previous.focus) {
+			previous.focus({ preventScroll: true });
+		}
+	};
+};
+
 const setState = (nodes, value) => nodes.forEach((node) => node.setAttribute("data-state", value));
 
 /**
@@ -97,7 +120,8 @@ const setState = (nodes, value) => nodes.forEach((node) => node.setAttribute("da
  * @param {boolean} [options.modal] trap focus, lock scroll, block layers below
  * @param {boolean} [options.escape] dismiss on Escape (default true)
  * @param {boolean} [options.outside] dismiss on outside pointerdown (default true)
- * @param {boolean} [options.focus] move focus into content (default = modal)
+ * @param {boolean} [options.focus] move focus into content (default = modal);
+ *   modal layers also trap Tab inside
  * @param {object} [options.anchor] `{ reference, side, align, sideOffset, alignOffset }`
  * @param {Element} [options.container] portal target (default document.body)
  * @returns {{ close: Function, update: Function }} close() resolves once removed
@@ -135,7 +159,7 @@ export const openLayer = (options) => {
 	// a detached scope so an effect that opened the layer can't tear them down.
 	const behaviors = untracked(() => scoped(() => ({
 		position: options.anchor ? follow(options.anchor.reference, content, options.anchor) : null,
-		release: wantsFocus ? trapFocus(content) : null
+		release: modal ? trapFocus(content) : (wantsFocus ? moveFocus(content) : null)
 	})));
 
 	let closed = false;
@@ -164,10 +188,11 @@ export const openLayer = (options) => {
 
 		setState(nodes, "closed");
 
-		return Promise.all(nodes.map(animateOut)).then(() => {
-			behaviors.dispose();
-			nodes.forEach((node) => node.remove());
-		});
+		// Each node leaves on its OWN animationend: the overlay's fade is shorter
+		// than the content's exit, and waiting for both would let the finished
+		// overlay snap back to visible for the difference (a flash).
+		return Promise.all(nodes.map((node) => animateOut(node).then(() => node.remove())))
+			.then(() => behaviors.dispose());
 	};
 
 	return {

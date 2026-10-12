@@ -46,7 +46,13 @@ functional array methods, JSDoc on option-heavy APIs, no `class` keyword.
   (layer stack — Escape/outside-click hit the right layer), `anchored`
   (positioning), `portal(…, { owner: trigger })` (so qrp contexts resolve from
   inside overlays). Each node leaves on its own `animationend` — waiting for all
-  nodes made the finished backdrop flash back. Popups use `popupRoot` /
+  nodes made the finished backdrop flash back. A close still in flight is
+  finished before the same content reopens (Dialog reuses its node).
+- **Modals** make everything else inert (Radix `hideOthers` walk) and lock
+  scroll (scrollbar-gap padding + wheel/touch guard). Popups opened from a modal
+  are separate layers ("shards") and must stay scrollable/clickable; regions
+  that must stay live behind a modal (toasts) carry `data-qs-keep` — they are
+  never made inert and count as inside every layer for dismissal. Popups use `popupRoot` /
   `contentPart` (`utils/popup.js`), modals `modalRoot` (`components/dialog.js`).
 - **Tests:** compare DOM nodes with `assert.ok(a === b)`, never
   `assert.equal` — a failing equal diffs two happy-dom objects and can eat

@@ -6,7 +6,7 @@
 // site/ and the import map is rewritten to point at those copies:
 //
 //   site/index.html           demo page (import map → ./vendor/…)
-//   site/app.js, demos/*.js   the demo code
+//   site/app.js, hero.js, demos/*.js   the demo code (+ qrp-logo.svg)
 //   site/demo.css             Tailwind build of the library + demo utilities
 //   site/vendor/qrp-shadcdn.js  our CDN bundle (imports only the bare qrp core)
 //   site/vendor/qrp/qrp.js      qrp's core — the one module the bundle needs
@@ -65,6 +65,8 @@ copyWithMap("dist/qrp-shadcdn.js", path.join(SITE, "vendor/qrp-shadcdn.js"));
 copyWithMap(path.join(QRP_DIST, "qrp.js"), path.join(SITE, "vendor/qrp/qrp.js"));
 
 copy("demo/app.js", path.join(SITE, "app.js"));
+copy("demo/hero.js", path.join(SITE, "hero.js"));
+copy("demo/qrp-logo.svg", path.join(SITE, "qrp-logo.svg"));
 fs.readdirSync("demo/demos")
 	.filter((file) => file.endsWith(".js"))
 	.forEach((file) => copy(path.join("demo/demos", file), path.join(SITE, "demos", file)));

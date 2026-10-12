@@ -6,3 +6,4 @@ coverage/
 *.tgz
 demo/demo.built.css
 *.tmp
+site/

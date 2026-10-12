@@ -221,6 +221,7 @@ npm test             # node --test + happy-dom
 npm run lint
 npm run build        # dist/qrp-shadcdn.js + dist/qrp-shadcdn.css
 npm run demo         # build + serve the demo page
+npm run build:site   # self-contained static demo in site/ (render.yaml deploys it)
 ```
 
 Components are ported from the shadcn/ui v4 sources: class strings verbatim,

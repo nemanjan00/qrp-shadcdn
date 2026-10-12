@@ -54,7 +54,8 @@
 		"build:demo": "node bin/build.js && tailwindcss -i demo/demo.css -o demo/demo.built.css.tmp && mv demo/demo.built.css.tmp demo/demo.built.css",
 		"demo": "npm run build:demo && python3 -m http.server 8000",
 		"typecheck": "tsc -p tsconfig.json",
-		"check:types": "NODE_OPTIONS=--max-old-space-size=512 node bin/check-types.js"
+		"check:types": "NODE_OPTIONS=--max-old-space-size=512 node bin/check-types.js",
+		"build:site": "node bin/build-site.js"
 	},
 	"lint-staged": {
 		"*.js": "eslint --fix"

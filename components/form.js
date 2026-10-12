@@ -38,9 +38,9 @@
  *   `registerInput()` types work here too.
  * - `FormFields({ form, fields })` — qrp's `{ key: { name, type, description,
  *   options, ...attrs } }` field map rendered as shadcn FormItems.
- * - `registerShadcnInputs()` swaps shadcn-styled factories into qrp's registry
- *   (text/email/password/number/url/tel/search/date/time/textarea/select/
- *   checkbox/radio), so plain qrp `form()` / `field()` get the shadcn controls.
+ * - `registerShadcnInputs()` puts the shadcn controls into qrp's input registry
+ *   (text-like types, textarea, select, native-select, checkbox, radio, switch,
+ *   slider, toggle, combobox), so plain qrp `form()` / `field()` render them.
  * https://ui.shadcn.com/docs/components/form
  */
 
@@ -51,6 +51,14 @@ import { part, parseArgs, pick, cn, uid, applyProps } from "../utils/index.js";
 import { Label } from "./label.js";
 import { Input } from "./input.js";
 import { Textarea } from "./textarea.js";
+import { checkboxInput } from "./checkbox.js";
+import { switchInput } from "./switch.js";
+import { radioGroupInput } from "./radio-group.js";
+import { sliderInput } from "./slider.js";
+import { toggleInput } from "./toggle.js";
+import { selectInput } from "./select.js";
+import { nativeSelectInput } from "./native-select.js";
+import { comboboxInput } from "./combobox.js";
 
 const snapshot = (values) => JSON.parse(JSON.stringify(values));
 
@@ -307,16 +315,15 @@ export const FormFields = (...args) => {
 
 const INPUT_TYPES = ["text", "email", "password", "number", "url", "tel", "search", "date", "time", "datetime-local", "month", "week"];
 
-const SELECT = "h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40";
-const CHECK = "peer size-4 shrink-0 rounded-[4px] border border-input accent-primary shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive";
-const RADIO = "aspect-square size-4 shrink-0 rounded-full border border-input accent-primary shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
-
 let registered = false;
 
 /**
- * Put shadcn-styled factories into qrp's input registry (once). The factories
- * keep qrp's contract — `(settings, key, spec) => Element`, two-way bound — so
- * qrp `form()` / `field()` and FormField all render the shadcn controls.
+ * Put the shadcn controls into qrp's input registry (once). Every factory keeps
+ * qrp's contract — `(settings, key, spec) => Element`, two-way bound — so qrp
+ * `form()` / `field()` and FormField render shadcn components: text-like types
+ * and textarea, `select` (the Radix-style Select; `native-select` for the
+ * native one), `checkbox`, `radio` (RadioGroup over `spec.options`), plus the
+ * types qrp has no native control for: `switch`, `slider`, `toggle`, `combobox`.
  *
  * @returns {void}
  */
@@ -327,29 +334,22 @@ export const registerShadcnInputs = () => {
 
 	registered = true;
 
-	const original = {
-		select: getInput("select"),
-		checkbox: getInput("checkbox"),
-		radio: getInput("radio")
-	};
-
 	INPUT_TYPES.forEach((type) => {
 		registerInput(type, (settings, key, spec = {}) => Input(Object.assign({ type }, attrsOf(spec), { bind: [settings, key] })));
 	});
 
 	registerInput("textarea", (settings, key, spec = {}) => Textarea(Object.assign({}, attrsOf(spec), { bind: [settings, key] })));
 
-	// Style qrp's own select/checkbox/radio controls rather than re-implement them.
-	registerInput("select", (settings, key, spec = {}) => applyProps(original.select(settings, key, spec), { "data-slot": "native-select", class: SELECT }));
-	registerInput("checkbox", (settings, key, spec = {}) => applyProps(original.checkbox(settings, key, spec), { "data-slot": "checkbox", class: CHECK }));
-	registerInput("radio", (settings, key, spec = {}) => {
-		const group = applyProps(original.radio(settings, key, spec), { "data-slot": "radio-group", role: "radiogroup", class: "grid gap-3" });
-
-		group.querySelectorAll("label").forEach((label) => applyProps(label, { class: "flex items-center gap-3 text-sm" }));
-		group.querySelectorAll("input").forEach((input) => applyProps(input, { class: RADIO }));
-
-		return group;
-	});
+	Object.entries({
+		select: selectInput,
+		"native-select": nativeSelectInput,
+		checkbox: checkboxInput,
+		radio: radioGroupInput,
+		switch: switchInput,
+		slider: sliderInput,
+		toggle: toggleInput,
+		combobox: comboboxInput
+	}).forEach(([type, factory]) => registerInput(type, factory));
 };
 
 export const FormItem = part("div", "form-item", "grid gap-2");
@@ -375,8 +375,11 @@ export const FormControl = (...args) => {
 	const { props, children } = parseArgs(args);
 	const only = children.length === 1 && children[0] instanceof Element ? children[0] : el("div", {}, ...children);
 
-	return applyProps(only, Object.assign({}, props, {
-		"data-slot": "form-control",
+	// Like Radix Slot, the child's own props win: a control keeps its data-slot
+	// (shadcn styles key off it); only a bare wrapper is tagged form-control.
+	const slot = only.hasAttribute("data-slot") ? {} : { "data-slot": "form-control" };
+
+	return applyProps(only, Object.assign({}, props, slot, {
 		id: field.itemId,
 		"aria-describedby": () => (field.error() ? `${field.descriptionId} ${field.messageId}` : field.descriptionId),
 		"aria-invalid": () => (field.error() ? "true" : "false")

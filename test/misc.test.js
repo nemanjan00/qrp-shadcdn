@@ -225,11 +225,20 @@ test("FormFields + registerShadcnInputs: qrp field specs render shadcn controls,
 	} });
 	const email = node.querySelector("input[type=email]");
 
-	assert.equal(email.getAttribute("data-slot"), "form-control");
+	assert.equal(email.getAttribute("data-slot"), "input", "FormControl keeps the control's own slot");
+	assert.ok(email.id && email.hasAttribute("aria-describedby"), "FormControl still wires id + aria");
 	assert.ok(email.className.includes("rounded-md border border-input"));
-	assert.equal(node.querySelector("select").value, "pro");
-	assert.ok(node.querySelector("select").className.includes("border-input"));
-	assert.ok(node.querySelector("input[type=checkbox]").className.includes("accent-primary"));
+	const trigger = node.querySelector("[data-slot=select-trigger]");
+
+	assert.ok(trigger, "select specs render the shadcn Select");
+	assert.equal(trigger.querySelector("[data-slot=select-value]").textContent, "Pro");
+
+	const agree = node.querySelector("[data-slot=checkbox]");
+
+	assert.equal(agree.getAttribute("role"), "checkbox");
+	assert.equal(agree.dataset.state, "unchecked");
+	agree.click();
+	assert.equal(form.values.agree, true, "the shadcn Checkbox is two-way bound to the form");
 
 	const settings = state({ name: "R2" });
 	const plain = qrpForm({ settings, fields: { name: { name: "Name", type: "text" } } });

@@ -1,0 +1,9 @@
+/* Demo page stylesheet: the library CSS plus the utilities the demo uses. */
+
+@import "tailwindcss" source(none);
+@import "tw-animate-css";
+@import "../styles/theme.css";
+
+@source "../components";
+@source "../icons";
+@source "./";

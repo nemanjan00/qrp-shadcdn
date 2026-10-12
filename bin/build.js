@@ -33,6 +33,8 @@ const JS_OUT = `${OUTDIR}/qrp-shadcdn.js`;
 const CSS_IN = "styles/qrp-shadcdn.css";
 const CSS_OUT = `${OUTDIR}/qrp-shadcdn.css`;
 const TAILWIND = "node_modules/.bin/tailwindcss";
+const THEME_SCRIPT_OUT = `${OUTDIR}/tailwind-theme.js`;
+const THEME_SOURCES = ["node_modules/tw-animate-css/dist/tw-animate.css", "styles/theme.css"];
 
 const kb = (bytes) => (bytes / 1024).toFixed(1) + " KB";
 const gzip = (buf) => zlib.gzipSync(buf, { level: 9 }).length;
@@ -90,6 +92,25 @@ const buildCss = () => {
 	fs.renameSync(temp, CSS_OUT);
 };
 
+// For pages using Tailwind's browser build (no build step, any utility class):
+// it compiles only inline <style type="text/tailwindcss"> and cannot @import
+// files, so ship the theme + tw-animate-css as a script that injects that tag.
+const buildThemeScript = () => {
+	const css = THEME_SOURCES.map((file) => fs.readFileSync(file, "utf8")).join("\n");
+	const script = [
+		"/* qrp-shadcdn theme for the Tailwind browser build. Includes tw-animate-css (MIT, Luca Bosin). */",
+		"(function () {",
+		"\tvar style = document.createElement(\"style\");",
+		"\tstyle.type = \"text/tailwindcss\";",
+		`\tstyle.textContent = ${JSON.stringify(css)};`,
+		"\tdocument.head.appendChild(style);",
+		"})();",
+		""
+	].join("\n");
+
+	writeAtomic(THEME_SCRIPT_OUT, script);
+};
+
 fs.mkdirSync(OUTDIR, { recursive: true });
 
 // Fail the build if anything but the bare core is imported from qrp.
@@ -107,10 +128,12 @@ buildJs()
 	.then(() => {
 		verifyImports();
 		buildCss();
+		buildThemeScript();
 
 		console.log("built:");
 		report(JS_OUT);
 		report(CSS_OUT);
+		report(THEME_SCRIPT_OUT);
 	})
 	.catch((error) => {
 		console.error(error);

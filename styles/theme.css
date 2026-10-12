@@ -1,12 +1,14 @@
 /*
  * qrp-shadcdn theme — the shadcn/ui v4 design tokens (neutral base color).
  *
- * Using Tailwind v4 yourself? Skip the prebuilt CSS and import this instead:
+ * Using Tailwind v4 yourself? Skip the prebuilt CSS; in your entry stylesheet
+ * import tailwindcss, then tw-animate-css, then this file
+ * ("@nemanjan00/qrp-shadcdn/theme.css"), and add an @source for
+ * node_modules/@nemanjan00/qrp-shadcdn/dist. The README has the exact snippet.
  *
- *   @import "tailwindcss";
- *   @import "tw-animate-css";
- *   @import "@nemanjan00/qrp-shadcdn/theme.css";
- *   @source "../node_modules/@nemanjan00/qrp-shadcdn/dist";
+ * (This comment must not contain a literal tailwind import statement: the
+ * Tailwind browser build pattern-matches for one and then skips loading
+ * Tailwind itself.)
  *
  * Re-skin by overriding the variables below (any shadcn theme from
  * ui.shadcn.com/themes pastes straight in). Dark mode: add `.dark` to <html>.

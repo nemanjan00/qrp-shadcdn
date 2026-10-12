@@ -221,3 +221,37 @@ InputOTP({ maxLength: 6, pattern: REGEXP_ONLY_DIGITS, onComplete: (code) => code
 InputOTP({ pattern: REGEXP_ONLY_DIGITS });
 // @ts-expect-error — not a calendar mode
 Calendar({ mode: "week" });
+
+// --- layout: Sidebar & DataTable ---------------------------------------------
+
+import {
+	SidebarProvider as SP, Sidebar as SB, SidebarContent as SC, SidebarMenu as SM, SidebarMenuItem as SMI,
+	SidebarMenuButton as SMB, SidebarTrigger as ST, SidebarInset as SI, useSidebar as useSB,
+	DataTable as DT, useDataTable as useDT, DataTableView as DTV, DataTablePagination as DTP,
+	DataTableViewOptions as DTO, DataTableColumnHeader as DTH, ArrowUpDownIcon as AUD
+} from "../index.js";
+
+SP({ defaultOpen: false, persist: false, onOpenChange: (open) => open },
+	SB({ collapsible: "icon", variant: "inset" }, SC(SM(SMI(SMB({ isActive: () => true, tooltip: "Home", size: "lg" }, "Home"))))),
+	SI(ST()));
+const sidebarState: "expanded" | "collapsed" = useSB().state;
+// @ts-expect-error — not a collapsible mode
+SB({ collapsible: "drawer" });
+
+interface Payment { id: string; email: string; amount: number }
+const payments: Payment[] = [{ id: "a", email: "a@example.com", amount: 1 }];
+const table = DT<Payment>({
+	data: () => payments,
+	selectable: true,
+	filterColumns: ["email"],
+	onSelectionChange: (rows) => rows.map((row) => row.amount),
+	columns: [{ key: "email", title: "Email", sortable: true }, { key: "amount", formatter: (value) => `$${value}`, hideable: false }]
+});
+const selected: Payment[] = table.dataTable.grid.selectedItems();
+const dt = useDT({ data: payments, columns: [{ key: "email" }] });
+DTV({ table: dt }); DTP({ table: dt, pageSizes: [5, 10] }); DTO({ table: dt });
+DTH({ table: dt, column: dt.columns[0], title: "Email" });
+AUD({ class: "size-4" });
+// @ts-expect-error — data is required
+useDT({ columns: [] });
+void sidebarState; void selected;

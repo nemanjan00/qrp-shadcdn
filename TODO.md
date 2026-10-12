@@ -61,7 +61,7 @@ bundle, and tested. Each links to the shadcn docs page it mirrors.
 - [x] [Spinner](https://ui.shadcn.com/docs/components/spinner)
 - [x] [Button Group](https://ui.shadcn.com/docs/components/button-group)
 - [x] [Combobox](https://ui.shadcn.com/docs/components/combobox)
-- [ ] [Data Table](https://ui.shadcn.com/docs/components/data-table)
+- [x] [Data Table](https://ui.shadcn.com/docs/components/data-table)
 - [x] [Date Picker](https://ui.shadcn.com/docs/components/date-picker)
 - [x] [Empty](https://ui.shadcn.com/docs/components/empty)
 - [x] [Field](https://ui.shadcn.com/docs/components/field)
@@ -75,5 +75,5 @@ bundle, and tested. Each links to the shadcn docs page it mirrors.
 - [x] Theme tokens + prebuilt `dist/qrp-shadcdn.css`
 - [x] Single-file ESM bundle for jsDelivr `+esm`
 - [x] Type declarations (`.d.ts`)
-- [ ] Demo / docs page
-- [ ] README
+- [x] Demo / docs page
+- [x] README

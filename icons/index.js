@@ -57,3 +57,8 @@ export const ArrowRightIcon = icon("arrow-right", [path("M5 12h14"), path("m12 5
 export const CalendarIcon = icon("calendar", [
 	path("M8 2v3"), path("M16 2v3"), ["rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }], path("M3 9h18")
 ]);
+export const ArrowUpIcon = icon("arrow-up", [path("m5 12 7-7 7 7"), path("M12 19V5")]);
+export const ArrowDownIcon = icon("arrow-down", [path("M12 5v14"), path("m19 12-7 7-7-7")]);
+export const ArrowUpDownIcon = icon("arrow-up-down", [path("m21 16-4 4-4-4"), path("M17 20V4"), path("m3 8 4-4 4 4"), path("M7 4v16")]);
+export const ChevronsLeftIcon = icon("chevrons-left", [path("m11 17-5-5 5-5"), path("m18 17-5-5 5-5")]);
+export const ChevronsRightIcon = icon("chevrons-right", [path("m6 17 5-5-5-5"), path("m13 17 5-5-5-5")]);

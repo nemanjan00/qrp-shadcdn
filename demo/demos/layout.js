@@ -6,7 +6,8 @@ import {
 	SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuAction, SidebarMenuBadge, SidebarMenuSub,
 	SidebarMenuSubItem, SidebarMenuSubButton, SidebarRail, SidebarInset, SidebarTrigger, SidebarSeparator,
 	Collapsible, CollapsibleTrigger, CollapsibleContent, Separator,
-	DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+	DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
+	DataTable, Button, Badge, toast,
 	Avatar, AvatarImage, AvatarFallback, Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink,
 	BreadcrumbPage, BreadcrumbSeparator,
 	ChevronRightIcon, ChevronsUpDownIcon, MoreHorizontalIcon, SearchIcon, CalendarIcon, PanelLeftIcon
@@ -106,3 +107,46 @@ demo("Sidebar", () => el("div", {
 		)
 	)
 )));
+
+// --- Data Table: shadcn's payments example ------------------------------------
+
+const PAYMENTS = state({ rows: [
+	{ id: "m5gr84i9", amount: 316, status: "success", email: "ken99@example.com" },
+	{ id: "3u1reuv4", amount: 242, status: "success", email: "Abe45@example.com" },
+	{ id: "derv1ws0", amount: 837, status: "processing", email: "Monserrat44@example.com" },
+	{ id: "5kma53ae", amount: 874, status: "success", email: "Silas22@example.com" },
+	{ id: "bhqecj4p", amount: 721, status: "failed", email: "carmella@example.com" },
+	{ id: "p0r8sd2f", amount: 129, status: "pending", email: "jason78@example.com" },
+	{ id: "k2n7xq1z", amount: 560, status: "success", email: "olivia.m@example.com" },
+	{ id: "t9w3vb6c", amount: 98, status: "failed", email: "noah_b@example.com" },
+	{ id: "h4j8ld0e", amount: 450, status: "processing", email: "emma.w@example.com" },
+	{ id: "r6y1pm3s", amount: 1024, status: "success", email: "liam.k@example.com" },
+	{ id: "z3c5nb7q", amount: 77, status: "pending", email: "ava.r@example.com" },
+	{ id: "f8g2hk4m", amount: 615, status: "success", email: "lucas.t@example.com" }
+] });
+
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+
+const rowActions = (payment) => DropdownMenu(
+	DropdownMenuTrigger(Button({ variant: "ghost", class: "h-8 w-8 p-0", "aria-label": "Open menu" }, MoreHorizontalIcon())),
+	DropdownMenuContent({ align: "end" },
+		DropdownMenuLabel("Actions"),
+		DropdownMenuItem({ onSelect: () => toast("Payment ID copied", { description: payment.id }) }, "Copy payment ID"),
+		DropdownMenuSeparator(),
+		DropdownMenuItem("View customer"),
+		DropdownMenuItem("View payment details"))
+);
+
+demo("Data Table", () => DataTable({
+	data: () => PAYMENTS.rows,
+	selectable: true,
+	filterColumns: ["email"],
+	filterPlaceholder: "Filter emails...",
+	pageSize: 10,
+	columns: [
+		{ key: "status", title: "Status", render: (p) => Badge({ variant: p.status === "failed" ? "destructive" : "secondary", class: "capitalize" }, p.status) },
+		{ key: "email", title: "Email", sortable: true, tdClass: "lowercase" },
+		{ key: "amount", title: "Amount", sortable: true, thClass: "text-right", tdClass: "text-right font-medium", formatter: (value) => usd.format(value) },
+		{ key: "actions", title: "Actions", hideable: false, header: () => "", render: rowActions }
+	]
+}));

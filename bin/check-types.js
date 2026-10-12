@@ -11,7 +11,7 @@ import fs from "node:fs";
 import process from "node:process";
 
 const DTS = "index.d.ts";
-const PENDING = ["../components/sidebar.js", "../components/data-table.js"];
+const PENDING = [];
 
 // `export const|function|let|class Name` and `export { a, b as c } from …`.
 const declaredValues = (source) => {

@@ -8,6 +8,8 @@
 
 import type { Props, Renderable } from "@nemanjan00/qrp";
 import type { InputFactory } from "@nemanjan00/qrp/forms";
+import type { Column as TableColumn } from "@nemanjan00/qrp/table";
+import type { DataGrid } from "@nemanjan00/qrp/datagrid";
 
 export * from "@nemanjan00/qrp";
 export { html, ref } from "@nemanjan00/qrp/html";
@@ -175,6 +177,11 @@ export const PanelLeftIcon: Icon;
 export const ArrowLeftIcon: Icon;
 export const ArrowRightIcon: Icon;
 export const CalendarIcon: Icon;
+export const ArrowUpIcon: Icon;
+export const ArrowDownIcon: Icon;
+export const ArrowUpDownIcon: Icon;
+export const ChevronsLeftIcon: Icon;
+export const ChevronsRightIcon: Icon;
 
 // --- basic components --------------------------------------------------------
 
@@ -1149,5 +1156,137 @@ export const REGEXP_ONLY_CHARS: string;
 export const REGEXP_ONLY_DIGITS_AND_CHARS: string;
 
 // --- layout: Sidebar & DataTable ----------------------------------------------
-// TODO(types): declare components/sidebar.js and components/data-table.js here
-// once they land (bin/check-types.js allowlists their exports until then).
+
+/** The sidebar controller (shadcn's useSidebar()); every getter is reactive. */
+export interface SidebarController {
+	open: boolean;
+	openMobile: boolean;
+	readonly isMobile: boolean;
+	readonly state: "expanded" | "collapsed";
+	setOpen(open: boolean): void;
+	setOpenMobile(open: boolean): void;
+	toggleSidebar(): void;
+}
+
+/** Sidebar — https://ui.shadcn.com/docs/components/sidebar */
+export const SidebarProvider: QsComponent<{
+	open?: Controllable<boolean>;
+	defaultOpen?: boolean;
+	onOpenChange?: (open: boolean) => void;
+	/** localStorage key for the open state (default "sidebar_state"); false disables. */
+	persist?: string | false;
+}>;
+export const Sidebar: QsComponent<{
+	side?: "left" | "right";
+	variant?: "sidebar" | "floating" | "inset";
+	collapsible?: "offcanvas" | "icon" | "none";
+}>;
+export const SidebarTrigger: QsComponent<ButtonProps, HTMLButtonElement>;
+export const SidebarRail: QsComponent<{}, HTMLButtonElement>;
+export const SidebarInset: QsComponent;
+export const SidebarInput: QsComponent<{}, HTMLInputElement>;
+export const SidebarHeader: QsComponent;
+export const SidebarFooter: QsComponent;
+export const SidebarSeparator: QsComponent;
+export const SidebarContent: QsComponent;
+export const SidebarGroup: QsComponent;
+export const SidebarGroupLabel: QsComponent;
+export const SidebarGroupAction: QsComponent<{}, HTMLButtonElement>;
+export const SidebarGroupContent: QsComponent;
+export const SidebarMenu: QsComponent<{}, HTMLUListElement>;
+export const SidebarMenuItem: QsComponent<{}, HTMLLIElement>;
+
+export type SidebarMenuButtonVariant = "default" | "outline";
+export type SidebarMenuButtonSize = "default" | "sm" | "lg";
+
+export function sidebarMenuButtonVariants(props?: {
+	variant?: MaybeThunk<SidebarMenuButtonVariant>;
+	size?: MaybeThunk<SidebarMenuButtonSize>;
+	class?: ClassValue;
+}): string | (() => string);
+
+export const SidebarMenuButton: QsComponent<{
+	isActive?: MaybeThunk<boolean>;
+	variant?: MaybeThunk<SidebarMenuButtonVariant>;
+	size?: MaybeThunk<SidebarMenuButtonSize>;
+	/** Shown when the sidebar is collapsed to icons: text, or `{ children, ...TooltipContent props }`. */
+	tooltip?: Renderable | ({ children?: Renderable } & PlacementProps & BaseProps);
+}>;
+export const SidebarMenuAction: QsComponent<{ showOnHover?: boolean }>;
+export const SidebarMenuBadge: QsComponent;
+export const SidebarMenuSkeleton: QsComponent<{ showIcon?: boolean }>;
+export const SidebarMenuSub: QsComponent<{}, HTMLUListElement>;
+export const SidebarMenuSubItem: QsComponent<{}, HTMLLIElement>;
+export const SidebarMenuSubButton: QsComponent<{ size?: "sm" | "md"; isActive?: MaybeThunk<boolean> }>;
+
+/** The controller of the provider around `node`, else of the most recent provider. */
+export function useSidebar(node?: Node): SidebarController;
+
+/** A DataTable column: a qrp table() column plus visibility options. */
+export interface DataTableColumn<T> extends Omit<TableColumn<T>, "label"> {
+	/** Header text (alias: label). */
+	title?: string;
+	label?: string;
+	/** Listed in the Columns menu (default true). */
+	hideable?: boolean;
+	/** Start hidden. */
+	hidden?: boolean;
+}
+
+export interface DataTableOptions<T> {
+	/** Rows, or a thunk returning them (reactive). */
+	data: readonly T[] | (() => readonly T[]);
+	columns: DataTableColumn<T>[];
+	/** Row => stable id (default row.id). */
+	key?: (item: T) => string | number;
+	/** Prepend a row-selection checkbox column. */
+	selectable?: boolean;
+	pageSize?: number;
+	pageSizes?: number[];
+	sort?: { key: string | null; dir?: 1 | -1 };
+	/** Keys the filter query searches (default every data column). */
+	filterColumns?: string[];
+	/** Replaces the query filter. */
+	filterFn?: (item: T, filter: { query: string } & Record<string, any>) => boolean;
+	onSelectionChange?: (selected: T[]) => void;
+}
+
+/** useDataTable() — the shared state + qrp datagrid every DataTable block takes as `table`. */
+export interface DataTableController<T> {
+	grid: DataGrid<T>;
+	sort: { key: string | null; dir?: number };
+	filter: { query: string } & Record<string, any>;
+	page: { index: number; size: number };
+	columns: DataTableColumn<T>[];
+	pageSizes: number[];
+	rows: () => readonly T[];
+	key: (item: T) => string | number;
+	/** The visible columns as qrp table() fields (reactive). */
+	fields(): TableColumn<T>[];
+}
+
+/** DataTable — https://ui.shadcn.com/docs/components/data-table */
+export function useDataTable<T>(options: DataTableOptions<T>): DataTableController<T>;
+
+export function DataTable<T>(props: DataTableOptions<T> & BaseProps & {
+	filterPlaceholder?: string;
+	/** false hides the filter + Columns toolbar. */
+	toolbar?: boolean;
+	/** Content of the no-results row. */
+	empty?: Renderable;
+}): HTMLElement & { dataTable: DataTableController<T> };
+
+export function DataTableView<T>(props: { table: DataTableController<T>; empty?: Renderable } & BaseProps): HTMLElement;
+export function DataTableFilter<T>(props: { table: DataTableController<T>; placeholder?: string } & BaseProps): HTMLInputElement;
+export function DataTableViewOptions<T>(props: { table: DataTableController<T>; label?: Renderable } & BaseProps): DocumentFragment;
+export function DataTablePagination<T>(props: {
+	table: DataTableController<T>;
+	pageSizes?: number[];
+	/** false hides the "x of y row(s) selected" text. */
+	selection?: boolean;
+} & BaseProps): HTMLElement;
+export function DataTableColumnHeader<T>(props: {
+	table: DataTableController<T>;
+	column: DataTableColumn<T>;
+	title?: string;
+} & BaseProps): HTMLElement;

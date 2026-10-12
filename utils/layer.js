@@ -26,13 +26,41 @@ import { animateOut, controllable } from "./index.js";
 // shadcn/Radix popup defaults that differ from qrp anchored's.
 const PLACEMENT_DEFAULTS = { align: "center", collisionPadding: 8 };
 
+// --- modal scroll lock ------------------------------------------------------
+//
+// overflow:hidden alone shifts the layout when the scrollbar disappears and is
+// ignored by iOS Safari's touch scrolling. Like Radix (react-remove-scroll):
+// pad the body by the scrollbar width, and block wheel/touch scrolling that
+// doesn't start inside an open modal's content.
+
 let scrollLocks = 0;
-let savedOverflow = "";
+let savedBody = null;
+const modalContents = new Set();
+
+const insideModal = (target) => [...modalContents].some((content) => content.contains(target));
+
+const blockScroll = (event) => {
+	if(!insideModal(event.target)) {
+		event.preventDefault();
+	}
+};
 
 const lockScroll = () => {
 	if(scrollLocks === 0) {
-		savedOverflow = document.body.style.overflow;
-		document.body.style.overflow = "hidden";
+		const body = document.body;
+		const gap = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+
+		savedBody = { overflow: body.style.overflow, paddingRight: body.style.paddingRight };
+		body.style.overflow = "hidden";
+
+		if(gap > 0) {
+			const padding = parseFloat(getComputedStyle(body).paddingRight) || 0;
+
+			body.style.paddingRight = `${padding + gap}px`;
+		}
+
+		document.addEventListener("wheel", blockScroll, { passive: false });
+		document.addEventListener("touchmove", blockScroll, { passive: false });
 	}
 
 	scrollLocks += 1;
@@ -41,9 +69,56 @@ const lockScroll = () => {
 const unlockScroll = () => {
 	scrollLocks = Math.max(0, scrollLocks - 1);
 
-	if(scrollLocks === 0) {
-		document.body.style.overflow = savedOverflow;
+	if(scrollLocks === 0 && savedBody) {
+		document.body.style.overflow = savedBody.overflow;
+		document.body.style.paddingRight = savedBody.paddingRight;
+		savedBody = null;
+		document.removeEventListener("wheel", blockScroll);
+		document.removeEventListener("touchmove", blockScroll);
 	}
+};
+
+// --- modal inert background -------------------------------------------------
+//
+// aria-modal + a focus trap still let a screen reader's virtual cursor walk
+// behind the dialog. Like Radix's hideOthers: while a modal is open, every other
+// top-level child of <body> is `inert` (unfocusable, unclickable, hidden from
+// assistive tech). Reference-counted, so nested modals stack and an element
+// that was inert before is left as it was.
+
+const inertCounts = new Map();
+
+const hideOthers = (keep) => {
+	const kept = keep.filter(Boolean);
+	const others = [...document.body.children].filter((child) =>
+		!kept.some((node) => child === node || child.contains(node)) &&
+		!["SCRIPT", "STYLE", "TEMPLATE"].includes(child.tagName));
+
+	others.forEach((child) => {
+		const count = inertCounts.get(child);
+
+		if(count === undefined) {
+			inertCounts.set(child, child.hasAttribute("inert") ? Infinity : 1);
+			child.setAttribute("inert", "");
+		} else {
+			inertCounts.set(child, count + 1);
+		}
+	});
+
+	return () => others.forEach((child) => {
+		const count = inertCounts.get(child);
+
+		if(count === undefined || count === Infinity) {
+			return;
+		}
+
+		if(count <= 1) {
+			inertCounts.delete(child);
+			child.removeAttribute("inert");
+		} else {
+			inertCounts.set(child, count - 1);
+		}
+	});
 };
 
 // Closes still waiting for their exit animation, by content node. Reopening the
@@ -135,8 +210,13 @@ export const openLayer = (options) => {
 	const behaviors = untracked(() => scoped(() => {
 		const removers = nodes.map((node) => portal(node, container, owner ? { owner } : {}));
 
+		if(modal) {
+			modalContents.add(content);
+		}
+
 		return {
 			removers,
+			restore: modal ? hideOthers(nodes) : null,
 			position: options.anchor ? anchored(reference, content, Object.assign({}, PLACEMENT_DEFAULTS, options.anchor)) : null,
 			release: modal ? trapFocus(content) : (wantsFocus ? moveFocus(content) : null),
 			undismiss: dismissable(content, onDismiss, {
@@ -159,6 +239,10 @@ export const openLayer = (options) => {
 		behaviors.value.undismiss();
 
 		if(modal) {
+			// Un-inert first: focus is about to return to the trigger, which an
+			// inert background would refuse.
+			behaviors.value.restore();
+			modalContents.delete(content);
 			unlockScroll();
 		}
 

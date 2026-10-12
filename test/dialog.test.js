@@ -211,3 +211,93 @@ test("reopening during the exit animation keeps the dialog (stale close must not
 		document.body.replaceChildren();
 	}
 });
+
+test("a modal makes the rest of the page inert and restores it; focus returns to the trigger", async () => {
+	const app = document.createElement("main");
+	const already = document.createElement("aside");
+
+	already.setAttribute("inert", "");
+	document.body.append(app, already);
+	app.append(buildDialog());
+
+	const trigger = app.querySelector("button");
+
+	trigger.focus();
+	trigger.click();
+
+	const content = document.querySelector("[data-slot=dialog-content]");
+
+	assert.ok(app.hasAttribute("inert"), "the page behind is inert");
+	assert.ok(!content.hasAttribute("inert") && !content.closest("[inert]"), "the dialog is not");
+	assert.ok(!document.querySelector("[data-slot=dialog-overlay]").hasAttribute("inert"));
+
+	key("Escape");
+	await tick();
+	assert.ok(!app.hasAttribute("inert"), "restored on close");
+	assert.ok(already.hasAttribute("inert"), "an element that was inert before stays inert");
+	assert.ok(document.activeElement === trigger, "focus went back to the trigger");
+	document.body.replaceChildren();
+});
+
+test("nested modals: closing the inner one keeps the outer page inert", async () => {
+	const outer = state({ open: true });
+	const inner = state({ open: false });
+	const app = document.createElement("main");
+
+	document.body.append(app);
+	app.append(Dialog({ open: [outer, "open"] }, DialogContent(DialogTitle("Outer"),
+		AlertDialog({ open: [inner, "open"] }, AlertDialogContent(AlertDialogTitle("Inner"))))));
+	await tick();
+	inner.open = true;
+	await tick();
+
+	const outerContent = document.querySelector("[data-slot=dialog-content]");
+
+	assert.ok(outerContent.hasAttribute("inert"), "the outer dialog is inert behind the inner one");
+	inner.open = false;
+	await tick();
+	assert.ok(!outerContent.hasAttribute("inert"), "outer dialog usable again");
+	assert.ok(app.hasAttribute("inert"), "page still inert behind the outer dialog");
+	outer.open = false;
+	await tick();
+	assert.ok(!app.hasAttribute("inert"));
+	document.body.replaceChildren();
+});
+
+test("modal scroll lock: scrollbar gap is padded; wheel/touch blocked outside the modal only", async () => {
+	const realInner = Object.getOwnPropertyDescriptor(window, "innerWidth");
+
+	Object.defineProperty(window, "innerWidth", { configurable: true, value: document.documentElement.clientWidth + 15 });
+
+	try {
+		const s = state({ open: true });
+
+		document.body.append(buildDialog({ open: [s, "open"] }));
+		await tick();
+		assert.equal(document.body.style.paddingRight, "15px", "compensates the 15px scrollbar");
+
+		const outside = new Event("wheel", { cancelable: true, bubbles: true });
+		const inside = new Event("wheel", { cancelable: true, bubbles: true });
+
+		document.body.dispatchEvent(outside);
+		document.querySelector("[data-slot=dialog-title]").dispatchEvent(inside);
+		assert.equal(outside.defaultPrevented, true, "page scroll blocked");
+		assert.equal(inside.defaultPrevented, false, "the modal itself still scrolls");
+
+		s.open = false;
+		await tick();
+		assert.equal(document.body.style.paddingRight, "");
+		assert.equal(document.body.style.overflow, "");
+
+		const after = new Event("wheel", { cancelable: true, bubbles: true });
+
+		document.body.dispatchEvent(after);
+		assert.equal(after.defaultPrevented, false, "guard removed");
+	} finally {
+		if(realInner) {
+			Object.defineProperty(window, "innerWidth", realInner);
+		}
+
+		document.body.replaceChildren();
+	}
+});

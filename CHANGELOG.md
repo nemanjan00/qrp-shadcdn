@@ -7,6 +7,12 @@ can land in a minor — they're marked ⚠️ **BREAKING**. Newest first.
 
 _(nothing yet)_
 
+## 0.2.3
+
+- Docs and package metadata only: the README leads with "shadcn/ui, without
+  React" and compares with shadcn on React; the package description, homepage
+  (the live demo) and keywords match. No code changes.
+
 ## 0.2.2
 
 Fixes for regressions in 0.2.1's modal changes:

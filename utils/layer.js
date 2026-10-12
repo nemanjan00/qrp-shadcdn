@@ -4,68 +4,30 @@
  *
  * A layer is portaled to <body>, gets `data-state="open"`, and on close flips
  * to `data-state="closed"`, waits for the exit animation, then leaves the DOM.
- * Open layers form a STACK so nesting behaves (the Radix DismissableLayer
- * model, which qrp's single-node `dismissable` can't express):
+ * The hard parts are qrp's own behaviors:
  *
- * - Escape dismisses only the topmost layer.
- * - A pointerdown dismisses layers from the top down until it reaches the layer
- *   it landed in — so clicking inside a popover that sits above a dialog closes
- *   neither, and clicking the dialog body closes just the popover. A modal
- *   layer stops the walk: what's under a modal can't be clicked anyway.
+ * - `dismissable` keeps every open layer in ONE stack, so nesting behaves:
+ *   Escape dismisses only the topmost layer, and a pointerdown dismisses layers
+ *   from the top down until it reaches the layer it landed in (a click inside a
+ *   popover above a dialog closes neither; a click on the dialog closes just
+ *   the popover). A modal layer stops the walk.
+ * - `anchored` places popups (side/align, flip + shift, `--qrp-*` CSS vars).
+ * - `portal` records the trigger as the content's owner, so qrp contexts
+ *   resolve from inside an overlay exactly as from inside its trigger.
  */
 
 import { scoped, untracked, effect, onDispose } from "@nemanjan00/qrp";
 import { trapFocus } from "@nemanjan00/qrp/behaviors/trap-focus";
-import { follow } from "./floating.js";
+import { dismissable } from "@nemanjan00/qrp/behaviors/dismissable";
+import { anchored } from "@nemanjan00/qrp/behaviors/anchored";
+import { portal } from "@nemanjan00/qrp/behaviors/portal";
 import { animateOut, controllable } from "./index.js";
 
-const stack = [];
+// shadcn/Radix popup defaults that differ from qrp anchored's.
+const PLACEMENT_DEFAULTS = { align: "center", collisionPadding: 8 };
 
-let listening = false;
 let scrollLocks = 0;
 let savedOverflow = "";
-
-const contains = (layer, target) => layer.inside.some((node) => node && node.contains(target));
-
-const onKeyDown = (event) => {
-	if(event.key !== "Escape") {
-		return;
-	}
-
-	const top = stack[stack.length - 1];
-
-	if(top && top.escape) {
-		event.preventDefault();
-		event.stopPropagation();
-		top.dismiss("escape");
-	}
-};
-
-const onPointerDown = (event) => {
-	const layers = stack.slice().reverse();
-
-	layers.every((layer) => {
-		if(contains(layer, event.target)) {
-			return false;
-		}
-
-		if(layer.armed && layer.outside) {
-			layer.dismiss("outside");
-		}
-
-		return !layer.modal;
-	});
-};
-
-const listen = () => {
-	if(listening) {
-		return;
-	}
-
-	listening = true;
-	document.addEventListener("keydown", onKeyDown, true);
-	document.addEventListener("pointerdown", onPointerDown, true);
-};
 
 const lockScroll = () => {
 	if(scrollLocks === 0) {
@@ -123,33 +85,35 @@ const setState = (nodes, value) => nodes.forEach((node) => node.setAttribute("da
  * @param {boolean} [options.focus] move focus into content (default = modal);
  *   modal layers also trap Tab inside
  * @param {object} [options.anchor] `{ reference, side, align, sideOffset, alignOffset }`
+ *   (qrp anchored options; align defaults to "center", collisionPadding to 8)
+ * @param {Node} [options.owner] where contexts resolve from (default: the first
+ *   `inside` node — the trigger — or the anchor reference)
  * @param {Element} [options.container] portal target (default document.body)
  * @returns {{ close: Function, update: Function }} close() resolves once removed
  */
 export const openLayer = (options) => {
-	listen();
-
 	const content = options.content;
 	const nodes = (options.extras || []).concat([content]);
 	const container = options.container || document.body;
 	const modal = Boolean(options.modal);
 	const wantsFocus = options.focus === undefined ? modal : options.focus;
+	const inside = options.inside || [];
+	const reference = options.anchor ? options.anchor.reference : null;
+	const owner = options.owner || inside.find((node) => node instanceof Node) || (reference instanceof Node ? reference : null);
 
-	const layer = {
-		inside: [content].concat(options.inside || []),
-		escape: options.escape !== false,
-		outside: options.outside !== false,
-		modal,
-		armed: false,
-		dismiss: (reason) => options.onDismiss(reason)
+	// qrp hands over the raw event; callers get "escape" | "outside". Escape is
+	// consumed so a component's own Escape handling doesn't run as well.
+	const onDismiss = (event) => {
+		if(event.type === "keydown") {
+			event.preventDefault();
+			event.stopPropagation();
+			options.onDismiss("escape");
+		} else {
+			options.onDismiss("outside");
+		}
 	};
 
 	setState(nodes, "open");
-	nodes.forEach((node) => container.appendChild(node));
-	stack.push(layer);
-
-	// The click that opened this layer must not count as an outside click.
-	const armTimer = setTimeout(() => { layer.armed = true; }, 0);
 
 	if(modal) {
 		lockScroll();
@@ -157,10 +121,21 @@ export const openLayer = (options) => {
 
 	// Behaviors register their own cleanup with the current owner; build them in
 	// a detached scope so an effect that opened the layer can't tear them down.
-	const behaviors = untracked(() => scoped(() => ({
-		position: options.anchor ? follow(options.anchor.reference, content, options.anchor) : null,
-		release: modal ? trapFocus(content) : (wantsFocus ? moveFocus(content) : null)
-	})));
+	const behaviors = untracked(() => scoped(() => {
+		const removers = nodes.map((node) => portal(node, container, owner ? { owner } : {}));
+
+		return {
+			removers,
+			position: options.anchor ? anchored(reference, content, Object.assign({}, PLACEMENT_DEFAULTS, options.anchor)) : null,
+			release: modal ? trapFocus(content) : (wantsFocus ? moveFocus(content) : null),
+			undismiss: dismissable(content, onDismiss, {
+				inside,
+				modal,
+				escape: options.escape !== false,
+				outside: options.outside !== false
+			})
+		};
+	}));
 
 	let closed = false;
 
@@ -170,13 +145,7 @@ export const openLayer = (options) => {
 		}
 
 		closed = true;
-		clearTimeout(armTimer);
-
-		const index = stack.indexOf(layer);
-
-		if(index !== -1) {
-			stack.splice(index, 1);
-		}
+		behaviors.value.undismiss();
 
 		if(modal) {
 			unlockScroll();
@@ -191,7 +160,7 @@ export const openLayer = (options) => {
 		// Each node leaves on its OWN animationend: the overlay's fade is shorter
 		// than the content's exit, and waiting for both would let the finished
 		// overlay snap back to visible for the difference (a flash).
-		return Promise.all(nodes.map((node) => animateOut(node).then(() => node.remove())))
+		return Promise.all(nodes.map((node, index) => animateOut(node).then(() => behaviors.value.removers[index]())))
 			.then(() => behaviors.dispose());
 	};
 
@@ -216,25 +185,47 @@ export const openLayer = (options) => {
  */
 export const layerWhen = (open, build, onOpen) => {
 	let handle = null;
+	let opening = false;
+	let wanted = false;
+
+	const sync = () => {
+		if(wanted && !handle) {
+			// openLayer can re-enter this effect synchronously (portal → setOwner
+			// → context readers re-run); the flag stops a second layer opening
+			// before `handle` is assigned. A close requested meanwhile is applied
+			// right after.
+			opening = true;
+
+			try {
+				handle = openLayer(Object.assign({ onDismiss: () => open.set(false) }, build()));
+			} finally {
+				opening = false;
+			}
+
+			if(onOpen) {
+				onOpen(handle);
+			}
+
+			if(!wanted) {
+				sync();
+			}
+		} else if(!wanted && handle) {
+			handle.close();
+			handle = null;
+		}
+	};
 
 	effect(() => {
-		const isOpen = Boolean(open.get());
+		wanted = Boolean(open.get());
 
-		untracked(() => {
-			if(isOpen && !handle) {
-				handle = openLayer(Object.assign({ onDismiss: () => open.set(false) }, build()));
-
-				if(onOpen) {
-					onOpen(handle);
-				}
-			} else if(!isOpen && handle) {
-				handle.close();
-				handle = null;
-			}
-		});
+		if(!opening) {
+			untracked(sync);
+		}
 	});
 
 	onDispose(() => {
+		wanted = false;
+
 		if(handle) {
 			handle.close();
 			handle = null;

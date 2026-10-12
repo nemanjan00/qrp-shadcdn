@@ -23,7 +23,7 @@ const CHECK_ITEM = "relative flex cursor-default items-center gap-2 rounded-xs p
 
 const parts = menuParts("menubar", {
 	// No exit animation on purpose (as in shadcn): switching menus is instant.
-	content: "z-50 min-w-[12rem] origin-(--qs-transform-origin) overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+	content: "z-50 min-w-[12rem] origin-(--qrp-transform-origin) overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
 	item: ITEM,
 	checkboxItem: CHECK_ITEM,
 	radioItem: CHECK_ITEM,
@@ -35,7 +35,7 @@ const parts = menuParts("menubar", {
 	shortcut: "ml-auto text-xs tracking-widest text-muted-foreground",
 	subTrigger: "flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none focus:bg-accent focus:text-accent-foreground data-[inset]:pl-8 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
 	subTriggerIcon: "ml-auto h-4 w-4",
-	subContent: "z-50 min-w-[8rem] origin-(--qs-transform-origin) overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+	subContent: "z-50 min-w-[8rem] origin-(--qrp-transform-origin) overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
 }, { align: "start", alignOffset: -4, sideOffset: 8 });
 
 // trigger element → { open, content } — how the bar reaches each menu.

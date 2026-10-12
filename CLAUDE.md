@@ -37,14 +37,16 @@ functional array methods, JSDoc on option-heavy APIs, no `class` keyword.
   "key"]`, or thunk, plus `default*` / `on*Change`. Keep names consistent across
   components (`onValueChange`, `onCheckedChange`, `onOpenChange`).
 - **Class strings are shadcn's, verbatim**, with `--radix-*` CSS vars renamed to
-  the `--qs-*` ones `utils/floating.js` sets (accordion keeps
+  the `--qrp-*` ones qrp's `anchored` sets (accordion keeps
   `--radix-accordion-content-height`, used by the keyframes). Tailwind scans
   `components/`, `icons/`, `utils/` (`source(none)` — nothing else).
 - **`cn`/`variants` resolve conflicts** via `utils/merge.js` (tailwind-merge
   semantics for the common groups). Don't hand-order classes to win the cascade.
-- **Overlays** go through `utils/layer.js` (stack: Escape/outside-click hit the
-  right layer; each node leaves on its own `animationend` — waiting for all
-  nodes made the finished backdrop flash back). Popups use `popupRoot` /
+- **Overlays** go through `utils/layer.js`, on qrp's behaviors: `dismissable`
+  (layer stack — Escape/outside-click hit the right layer), `anchored`
+  (positioning), `portal(…, { owner: trigger })` (so qrp contexts resolve from
+  inside overlays). Each node leaves on its own `animationend` — waiting for all
+  nodes made the finished backdrop flash back. Popups use `popupRoot` /
   `contentPart` (`utils/popup.js`), modals `modalRoot` (`components/dialog.js`).
 - **Tests:** compare DOM nodes with `assert.ok(a === b)`, never
   `assert.equal` — a failing equal diffs two happy-dom objects and can eat

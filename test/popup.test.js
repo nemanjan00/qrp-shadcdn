@@ -123,3 +123,31 @@ test("HoverCard: stays open while the pointer is over the card", async () => {
 	assert.equal(content.isConnected, false);
 	document.body.replaceChildren();
 });
+
+test("layerWhen: re-entering the open effect while a layer opens opens it once", async () => {
+	const { layerWhen } = await import("../utils/layer.js");
+	const { controllable } = await import("../utils/index.js");
+	const { effect: run } = await import("@nemanjan00/qrp");
+	const pokes = state({ n: 0 });
+	const open = controllable(undefined, false);
+	let builds = 0;
+
+	// An effect that also reads `pokes`, and a build() that writes it — the
+	// synchronous re-entry the portal → setOwner → context path produces.
+	run(() => {
+		pokes.n;
+	});
+
+	layerWhen({ get: () => (pokes.n, open.get()), set: open.set }, () => {
+		builds += 1;
+		pokes.n += 1;
+
+		return { content: document.createElement("div") };
+	});
+
+	open.set(true);
+	assert.equal(builds, 1, "one layer, not one per re-entry");
+	open.set(false);
+	await tick();
+	document.body.replaceChildren();
+});

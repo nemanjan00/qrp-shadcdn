@@ -180,6 +180,30 @@ el("span", { class: pill({ tone: () => s.level }) }, "Status");
 `class` override a component default, use Tailwind's important modifier
 (`w-full!`) or plug in tailwind-merge: `setClassMerge(twMerge)`.
 
+## Built on qrp, not beside it
+
+Where qrp already has the concept, the component is a skin over it — your plain
+qrp code and the components share state, events and data:
+
+| shadcn | qrp underneath |
+|---|---|
+| Form, Field | `forms` + `utils/validate`. `registerShadcnInputs()` puts the shadcn controls into qrp's input registry, so plain qrp `form({ settings, fields })` renders Select, Checkbox, Switch, Slider, RadioGroup, Combobox… Each control also exports its adapter (`checkboxInput`, `selectInput`, …) for `registerInput`. |
+| Sonner, Toast | `toasts` over the `events` bus — `notify.success("Saved")` from anywhere shows a sonner-styled toast. |
+| Pagination | `PaginationFor(grid)` renders a `datagrid` pager. |
+| Collapsible, Accordion | `behaviors/disclosure`. |
+| Chart | `scale`, `timeseries` (LTTB downsampling), `format`; `spark` for `ChartSparkline`. |
+| Combobox | `collection` filters its data-driven `items` into a keyed `list()`. |
+| useIsMobile | `browser`'s `media()`. |
+
+Everything takes qrp's `bind: [state, "key"]`, and items rendered through
+`list()` / `when()` (menu items, options, tabs, radio items) are wired as they
+appear.
+
+**CDN note:** the CDN bundle carries its own copy of qrp's stateful helpers
+(events bus, toasts). On a CDN page, take `notify` / `bus` from the bundle, not
+from a separate `@nemanjan00/qrp/toasts` URL. With npm + a bundler there is one
+copy of everything and this doesn't apply.
+
 ## Components
 
 See [TODO.md](TODO.md) for the full list and status — every component shadcdn

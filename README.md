@@ -63,7 +63,7 @@ import "@nemanjan00/qrp-shadcdn/qrp-shadcdn.css";
 qrp is a peer dependency, so your app and the components share one copy. The
 package entry is the plain ES-module source — one file per component, no side
 effects — so the bundler keeps only what you import: a page using just `Button`
-ships about 5 KB gzipped (qrp included), one with a `Dialog` about 9.4 KB.
+ships about 5 KB gzipped (qrp included), one with a `Dialog` about 9.8 KB.
 
 ### Self-hosted, no tooling
 

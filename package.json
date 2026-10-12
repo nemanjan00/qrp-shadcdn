@@ -52,7 +52,9 @@
 		"prepack": "node bin/build.js",
 		"prepare": "husky",
 		"build:demo": "node bin/build.js && tailwindcss -i demo/demo.css -o demo/demo.built.css.tmp && mv demo/demo.built.css.tmp demo/demo.built.css",
-		"demo": "npm run build:demo && python3 -m http.server 8000"
+		"demo": "npm run build:demo && python3 -m http.server 8000",
+		"typecheck": "tsc -p tsconfig.json",
+		"check:types": "NODE_OPTIONS=--max-old-space-size=512 node bin/check-types.js"
 	},
 	"lint-staged": {
 		"*.js": "eslint --fix"
@@ -74,6 +76,7 @@
 		"husky": "^9.1.7",
 		"lint-staged": "^17.6.0",
 		"tailwindcss": "^4.3.3",
-		"tw-animate-css": "^1.4.0"
+		"tw-animate-css": "^1.4.0",
+		"typescript": "^7.0.2"
 	}
 }

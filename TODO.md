@@ -74,6 +74,6 @@ bundle, and tested. Each links to the shadcn docs page it mirrors.
 - [x] `cn` / `variants` (cva) / `part` helpers
 - [x] Theme tokens + prebuilt `dist/qrp-shadcdn.css`
 - [x] Single-file ESM bundle for jsDelivr `+esm`
-- [ ] Type declarations (`.d.ts`)
+- [x] Type declarations (`.d.ts`)
 - [ ] Demo / docs page
 - [ ] README

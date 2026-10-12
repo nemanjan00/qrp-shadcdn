@@ -15,7 +15,7 @@ ships, plus the newer shadcn/ui ones, ported to qrp in the shadcn v4 look.
 - **Install like shadcdn.** One ES module + one stylesheet from jsDelivr for
   prototyping (`dist/qrp-shadcdn.js/+esm`); the npm entry is the unbundled,
   side-effect-free source, so bundlers tree-shake to what you import (Button
-  alone ≈ 3.5 KB gzip including qrp).
+  alone ≈ 5 KB gzip including qrp).
 - **One reactive core.** The CDN bundle imports only the bare `@nemanjan00/qrp`
   and re-exports qrp's core, so the app and the components can't end up on two
   copies.

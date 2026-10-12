@@ -1,0 +1,12 @@
+/*
+ * Build entry for dist/qrp-shadcdn.css — the prebuilt stylesheet CDN users
+ * link. Tailwind scans the component sources and emits only the utilities
+ * they use, plus the theme tokens and preflight.
+ */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./theme.css";
+
+@source "../components";
+@source "../icons";

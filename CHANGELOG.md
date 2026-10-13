@@ -7,6 +7,19 @@ can land in a minor — they're marked ⚠️ **BREAKING**. Newest first.
 
 _(nothing yet)_
 
+## 0.3.0
+
+- ⚠️ **BREAKING: requires `@nemanjan00/qrp` `^0.13.0`** (peer dependency, was
+  `^0.12.2`). 0.13.0 is a batch of qrp fixes that components get for free: lists
+  follow in-place `sort`/`splice`/`unshift`, `el()` removes attributes set to
+  `null`/`false` instead of writing `"null"`/`"false"`, `trapFocus` skips
+  untabbable elements, `busyWhile` no longer loops when run inside an effect,
+  and more — see qrp's CHANGELOG.
+- **`DataTable` sorting follows qrp 0.13's comparator:** empty values sort last
+  in both directions, and strings sort in natural, locale-aware order
+  (`"item 2"` before `"item 10"`, `"a"` before `"B"`). Pagers and summaries show
+  the clamped page when a filter shrinks the data.
+
 ## 0.2.3
 
 - Docs and package metadata only: the README leads with "shadcn/ui, without
@@ -62,7 +75,7 @@ Fixes for regressions in 0.2.1's modal changes:
 
 ## 0.2.0
 
-Built further on qrp (now `^0.12.2`): the pieces this package had to write for
+Built further on qrp (then `^0.12.2`): the pieces this package had to write for
 itself in 0.1.0 moved into qrp, and the components now use them.
 
 - **Overlays run on qrp's own behaviors.** Dismissal (one Escape / outside-click

@@ -7,6 +7,12 @@ can land in a minor — they're marked ⚠️ **BREAKING**. Newest first.
 
 _(nothing yet)_
 
+## 0.3.1
+
+- **Requires `@nemanjan00/qrp` `^0.13.1`.** With 0.13.1, `el()` sets read-only DOM
+  props (`list`, `form`, …) as attributes instead of throwing, so
+  `Input({ list: "suggestions" })` now works.
+
 ## 0.3.0
 
 - ⚠️ **BREAKING: requires `@nemanjan00/qrp` `^0.13.0`** (peer dependency, was

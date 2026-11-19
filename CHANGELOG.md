@@ -5,6 +5,14 @@ can land in a minor — they're marked ⚠️ **BREAKING**. Newest first.
 
 ## Unreleased
 
+_(nothing yet)_
+
+## 0.4.0
+
+- **Requires `@nemanjan00/qrp` `^0.14.0`.** 0.14.0 adds `socket`, `onChange`,
+  `searchFilter`, `si`/`parseSI`, `embed` and `stickToBottom`, and fixes
+  `copy()` on plain-http origins. The bundle re-exports the qrp core, so
+  `onChange` is available from it.
 - **New: `confirmDialog(options)` → `Promise<boolean>`** — a promise-returning
   AlertDialog (`title`, `description`, `confirmText`, `cancelText`,
   `destructive`). Cancel / Escape resolve `false`. The styled replacement for

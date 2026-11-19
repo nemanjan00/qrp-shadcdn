@@ -5,7 +5,18 @@ can land in a minor — they're marked ⚠️ **BREAKING**. Newest first.
 
 ## Unreleased
 
-_(nothing yet)_
+- **New: `confirmDialog(options)` → `Promise<boolean>`** — a promise-returning
+  AlertDialog (`title`, `description`, `confirmText`, `cancelText`,
+  `destructive`). Cancel / Escape resolve `false`. The styled replacement for
+  `window.confirm()`.
+- **New: `promptDialog(options)` → `Promise<values | null>`** — a form in a Dialog
+  built from a qrp field map (`fields`, `values`, `schema`, `validate`).
+  `onSubmit(values)` may return a promise: the submit button is busy while it is
+  pending, and a **rejection keeps the dialog open** with the error's message
+  (server-side validation). Resolves the values (or `onSubmit`'s result), or
+  `null` on cancel / Escape / outside click. Both mount into `<body>` on their
+  own scope, return focus to the opener and release their nodes after the exit
+  animation.
 
 ## 0.3.1
 

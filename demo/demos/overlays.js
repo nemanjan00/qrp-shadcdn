@@ -7,7 +7,8 @@ import {
 	AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 	Drawer, DrawerTrigger, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter, DrawerClose,
 	Popover, PopoverTrigger, PopoverContent, Tooltip, TooltipTrigger, TooltipContent,
-	HoverCard, HoverCardTrigger, HoverCardContent, Avatar, AvatarImage, AvatarFallback
+	HoverCard, HoverCardTrigger, HoverCardContent, Avatar, AvatarImage, AvatarFallback,
+	confirmDialog, promptDialog
 } from "@nemanjan00/qrp-shadcdn";
 import { demo, field } from "./registry.js";
 
@@ -83,3 +84,38 @@ demo("Hover Card", () => HoverCard(
 			el("div", { class: "text-xs text-muted-foreground" }, "Joined December 2021"))
 	))
 ));
+
+demo("Promise dialogs", () => {
+	const log = state({ text: "—" });
+
+	const ask = () => confirmDialog({
+		title: "Delete this preset?",
+		description: "This cannot be undone.",
+		confirmText: "Delete",
+		destructive: true
+	}).then((ok) => {
+		log.text = `confirmDialog → ${ok}`;
+	});
+
+	const rename = () => promptDialog({
+		title: "Rename preset",
+		description: "\"taken\" is rejected by the fake server.",
+		fields: { name: { label: "Name" } },
+		values: { name: "bench" },
+		schema: { name: { required: true, message: "Name is required." } },
+		onSubmit: (values) => new Promise((resolve, reject) => setTimeout(() => {
+			if(values.name === "taken") {
+				reject(new Error("That name is already taken."));
+			} else {
+				resolve(values);
+			}
+		}, 600))
+	}).then((values) => {
+		log.text = `promptDialog → ${JSON.stringify(values)}`;
+	});
+
+	return el("div", { class: "flex flex-wrap items-center gap-2" },
+		Button({ variant: "outline", onclick: ask }, "confirmDialog"),
+		Button({ variant: "outline", onclick: rename }, "promptDialog"),
+		el("code", { class: "text-sm text-muted-foreground" }, () => log.text));
+});

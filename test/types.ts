@@ -28,7 +28,7 @@ import {
 	Calendar, DatePicker, ChartContainer, BarChart, Bar, XAxis, CartesianGrid, ChartTooltip,
 	ChartTooltipContent, Carousel, CarouselContent, CarouselItem, ResizablePanelGroup, ResizablePanel,
 	ResizableHandle, ScrollArea, ScrollBar, InputOTP, InputOTPGroup, InputOTPSlot, REGEXP_ONLY_DIGITS,
-	CheckIcon
+	CheckIcon, confirmDialog, promptDialog
 } from "../index.js";
 import type { ChartConfig, CarouselApi, FormController } from "../index.js";
 import { registerInput } from "@nemanjan00/qrp/forms";
@@ -255,3 +255,18 @@ AUD({ class: "size-4" });
 // @ts-expect-error — data is required
 useDT({ columns: [] });
 void sidebarState; void selected;
+
+// Promise dialogs
+const confirmed: Promise<boolean> = confirmDialog({ title: "Delete?", destructive: true });
+const prompted: Promise<{ name: string } | null> = promptDialog<{ name: string }>({
+	fields: { name: { label: "Name" } },
+	values: { name: "main" },
+	onSubmit: (v) => Promise.resolve(v)
+});
+const saved: Promise<{ name: string } | { id: number } | null> = promptDialog<{ name: string }, { id: number }>({
+	fields: { name: {} },
+	onSubmit: () => ({ id: 1 })
+});
+// @ts-expect-error — fields is required
+promptDialog({ title: "x" });
+void confirmed; void prompted; void saved;

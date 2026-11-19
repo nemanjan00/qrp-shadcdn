@@ -69,6 +69,12 @@ bundle, and tested. Each links to the shadcn docs page it mirrors.
 - [x] [Item](https://ui.shadcn.com/docs/components/item)
 - [x] [Native Select](https://ui.shadcn.com/docs/components/native-select)
 
+## qrp-shadcdn extras
+
+Not in shadcn — gaps found building real apps on this library.
+
+- [x] `confirmDialog` / `promptDialog` — promise-returning AlertDialog / form Dialog (replaces `window.confirm` / `window.prompt`; async `onSubmit` rejection keeps the dialog open with the message)
+
 ## Infrastructure
 
 - [x] `cn` / `variants` (cva) / `part` helpers

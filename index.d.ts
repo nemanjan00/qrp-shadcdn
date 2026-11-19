@@ -839,6 +839,46 @@ export const FormMessage: QsComponent<{}, HTMLParagraphElement>;
 /** Put the shadcn-styled controls into qrp's input registry. */
 export function registerShadcnInputs(): void;
 
+/** Promise dialogs — styled, non-blocking `confirm()` / `prompt()`. */
+export interface ConfirmDialogOptions {
+	/** Default "Are you sure?". */
+	title?: Renderable;
+	description?: Renderable;
+	/** Default "Continue". */
+	confirmText?: Renderable;
+	/** Default "Cancel". */
+	cancelText?: Renderable;
+	/** Red confirm button. */
+	destructive?: boolean;
+}
+/** Ask a yes/no question: `true` on confirm, `false` on cancel or Escape. */
+export function confirmDialog(options?: ConfirmDialogOptions): Promise<boolean>;
+export interface PromptDialogOptions<T extends Record<string, any>, R = T> {
+	title?: Renderable;
+	description?: Renderable;
+	/** qrp field map: `{ key: { type, label, default, options, description, ...attrs } }`. */
+	fields: Record<keyof T & string, Record<string, any>>;
+	/** Initial values; override each field's `default`. */
+	values?: Partial<T>;
+	/** A qrp `validate` schema (per-field messages). */
+	schema?: Record<string, any>;
+	validate?: (values: T) => Partial<Record<keyof T & string, string>> | null | undefined;
+	/**
+	 * Runs on a valid submit. A rejection keeps the dialog open and shows the
+	 * error's message; a resolved value other than undefined is what the
+	 * promise resolves with (else the values).
+	 */
+	onSubmit?: (values: T) => R | void | Promise<R | void>;
+	/** Default "Save". */
+	submitText?: Renderable;
+	/** Default "Cancel". */
+	cancelText?: Renderable;
+	/** Extra classes for the dialog content. */
+	class?: ClassValue;
+}
+/** Ask for values with a form in a dialog: the values (or onSubmit's result), or null when cancelled. */
+export function promptDialog<T extends Record<string, any> = Record<string, any>, R = T>(options: PromptDialogOptions<T, R>): Promise<T | R | null>;
+
 /** Sonner — https://ui.shadcn.com/docs/components/sonner */
 export type ToastVariant = "default" | "success" | "error" | "info" | "warning" | "loading" | "custom";
 export interface ToastAction { label: Renderable; onClick: (event: Event) => void }

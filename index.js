@@ -57,6 +57,7 @@ export * from "./components/button-group.js";
 export * from "./components/empty.js";
 export * from "./components/field.js";
 export * from "./components/form.js";
+export * from "./components/prompt.js";
 export * from "./components/input-group.js";
 export * from "./components/item.js";
 export * from "./components/pagination.js";

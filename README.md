@@ -244,6 +244,37 @@ appear.
 from a separate `@nemanjan00/qrp/toasts` URL. With npm + a bundler there is one
 copy of everything and this doesn't apply.
 
+## Promise dialogs
+
+shadcn has no imperative dialog API, so apps fall back to the browser's blocking
+`confirm()` / `prompt()`. Two extras fill that gap — same modal machinery as
+AlertDialog / Dialog (layer stack, inert background, scroll lock, focus trap),
+no trigger or host element needed:
+
+```js
+import { confirmDialog, promptDialog } from "@nemanjan00/qrp-shadcdn";
+
+if(await confirmDialog({ title: "Remove tab?", description: "Its panes move to main.", confirmText: "Remove", destructive: true })) {
+	removeTab();
+}
+
+const values = await promptDialog({
+	title: "Rename tab",
+	fields: { name: { label: "Name", required: true } },  // qrp field map
+	values: { name: current },
+	schema: { name: { required: true, message: "Name is required." } },
+	// a rejection keeps the dialog open and shows err.message (server-side checks)
+	onSubmit: (v) => api.renameTab(current, v.name)
+});
+// → the values (or onSubmit's resolved value), or null when cancelled
+```
+
+`confirmDialog` resolves `true`/`false` (Escape = `false`). `promptDialog`
+renders `fields` through `FormFields` (so `registerInput()` types work), shows a
+spinner on the submit button while `onSubmit` is pending, and resolves `null` on
+cancel, Escape, outside click or the close button. Focus returns to whatever
+had it before the dialog opened.
+
 ## Components
 
 See [TODO.md](TODO.md) for the full list and status — every component shadcdn

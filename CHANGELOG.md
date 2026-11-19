@@ -5,7 +5,13 @@ can land in a minor — they're marked ⚠️ **BREAKING**. Newest first.
 
 ## Unreleased
 
-_(nothing yet)_
+- **README leads with npm + a bundler.** The quick start installs from npm;
+  the CDN bundle moved to the end of Install as "prototypes only", with why
+  (network dependency, every component loaded, easy to get two copies of qrp).
+  The Tailwind browser build is marked as a prototyping option too.
+- **README points at qrp's docs** before you write code: SHARP-EDGES (cleanup
+  with `onDispose`, one copy of qrp per page), API and RECIPES, which ship in
+  `node_modules/@nemanjan00/qrp/docs/`.
 
 ## 0.4.1
 

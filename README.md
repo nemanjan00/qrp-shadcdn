@@ -11,26 +11,44 @@ step required.
 [qrp](https://qrp.nemanja.top/) ·
 [Changelog](CHANGELOG.md)
 
-```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.css">
-
-<script type="module">
-	import { state, mount, el, Button, Card, CardHeader, CardTitle, CardContent, Input }
-		from "https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.js/+esm";
-
-	const s = state({ name: "" });
-
-	mount(document.body, () => Card({ class: "m-8 max-w-sm" },
-		CardHeader(CardTitle("Hello")),
-		CardContent({ class: "grid gap-3" },
-			Input({ placeholder: "Your name", bind: [s, "name"] }),
-			Button({ onclick: () => alert(`Hi ${s.name}`) }, "Greet")
-		)
-	));
-</script>
+```sh
+npm i @nemanjan00/qrp @nemanjan00/qrp-shadcdn
 ```
 
-That is the whole app: one stylesheet, one import, no bundler, no JSX.
+```js
+import { state, mount } from "@nemanjan00/qrp";
+import { Button, Card, CardHeader, CardTitle, CardContent, Input } from "@nemanjan00/qrp-shadcdn";
+import "@nemanjan00/qrp-shadcdn/qrp-shadcdn.css";
+
+const s = state({ name: "" });
+
+mount(document.body, () => Card({ class: "m-8 max-w-sm" },
+	CardHeader(CardTitle("Hello")),
+	CardContent({ class: "grid gap-3" },
+		Input({ placeholder: "Your name", bind: [s, "name"] }),
+		Button({ onclick: () => alert(`Hi ${s.name}`) }, "Greet")
+	)
+));
+```
+
+That is the whole app: no JSX, no providers. Any bundler works (Vite, esbuild,
+Rollup, webpack), and it keeps only the components you import. Sketching
+something in a single HTML file? The [CDN bundle](#cdn--prototypes-only) runs
+the same code with no install. Use it for prototypes, not for an app you ship.
+
+> **📚 Before you write code, read qrp's docs.** Every component is built on
+> qrp, so its rules apply to your app code too. They ship in the package at
+> `node_modules/@nemanjan00/qrp/docs/`:
+>
+> - **[SHARP-EDGES.md](https://github.com/nemanjan00/qrp/blob/master/docs/SHARP-EDGES.md)**:
+>   behaviors that bite once. Thunk vs. value reactivity, `list()` keys,
+>   cleanup with `onDispose` (there is no `ondisconnect`), one copy of qrp per page.
+> - **[API.md](https://github.com/nemanjan00/qrp/blob/master/docs/API.md)**:
+>   every export of qrp's core (`state`, `effect`, `onChange`, `el`, `when`,
+>   `list`, `mount`, `scoped`, `onDispose`, `router`, …) and modules, with signatures.
+> - **[RECIPES.md](https://github.com/nemanjan00/qrp/blob/master/docs/RECIPES.md)**:
+>   "I'm about to write X" → the qrp helper that already does it (polling,
+>   WebSocket, CSV export, hosting a canvas or chart widget, …).
 
 ## Why without React?
 
@@ -65,27 +83,7 @@ for React — one ES module on a CDN — and, unlike it, tree-shakeable from npm
 
 ## Install
 
-### CDN (like shadcdn) — for prototyping
-
-One script import, one stylesheet:
-
-```
-https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.js/+esm
-https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.css
-```
-
-Use the `dist/qrp-shadcdn.js/+esm` path, not the package root: the root is the
-unbundled source for bundlers. The CDN bundle carries every component — fine for
-a prototype; for a real app, install from npm and let your bundler tree-shake.
-
-**Import qrp from the same URL.** The bundle re-exports qrp's core (`state`,
-`effect`, `el`, `mount`, `list`, `when`, `router`, …) and `html`, so a page can
-take everything from this one module. That matters: reactivity lives in qrp's
-module state, and a second copy of qrp (from another CDN URL) would not see the
-components' bindings. Pin a version in production
-(`…/qrp-shadcdn@0.1.0/dist/qrp-shadcdn.js/+esm`).
-
-### npm + a bundler
+### npm + a bundler (recommended)
 
 ```sh
 npm i @nemanjan00/qrp @nemanjan00/qrp-shadcdn
@@ -119,16 +117,53 @@ your page and map the names:
 The bundle imports nothing but the bare `@nemanjan00/qrp` specifier (the build
 enforces it), so that single mapping is all it needs.
 
+### CDN — prototypes only
+
+For a single-file sketch, a demo or a REPL, one script import and one stylesheet
+need no install:
+
+```
+https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.js/+esm
+https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.css
+```
+
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.css">
+<script type="module">
+	import { state, mount, el, Button } from "https://cdn.jsdelivr.net/npm/@nemanjan00/qrp-shadcdn/dist/qrp-shadcdn.js/+esm";
+</script>
+```
+
+> **⚠️ Don't ship an app on the CDN.** It's a network dependency on someone
+> else's server (one failed fetch and the page is blank), it loads every
+> component whether you use it or not, and it's easy to end up with two copies
+> of qrp. When the prototype becomes real, move to npm + a bundler (above) or
+> self-host the files.
+
+Use the `dist/qrp-shadcdn.js/+esm` path, not the package root: the root is the
+unbundled source for bundlers.
+
+**Import qrp from the same URL.** The bundle re-exports qrp's core (`state`,
+`effect`, `el`, `mount`, `list`, `when`, `onDispose`, `router`, …) and `html`,
+so take everything from this one module. Reactivity lives in qrp's module
+state, and a second copy of qrp (from another CDN URL) won't see the
+components' bindings. qrp ≥ 0.15.1 logs `qrp: a second copy of qrp's core
+loaded` when that happens. Pin a version
+(`…/qrp-shadcdn@X.Y.Z/dist/qrp-shadcdn.js/+esm`) so the page doesn't change
+under you.
+
 ## Styling
 
 `qrp-shadcdn.css` contains Tailwind's preflight, the shadcn theme tokens, and the
 utilities the components use — nothing else. Three ways to go from there:
 
 - **Just the components.** Link the CSS and write your own layout CSS.
-- **Tailwind classes in your page, no build.** Use Tailwind's browser build
-  instead of the prebuilt CSS, plus our theme script (the browser build can't
-  `@import` files, so the theme and tw-animate-css ship as a script that injects
-  them). Then any utility works in `class`:
+- **Tailwind classes in your page, no build (prototypes).** Use Tailwind's
+  browser build instead of the prebuilt CSS, plus our theme script (the browser
+  build can't `@import` files, so the theme and tw-animate-css ship as a script
+  that injects them). Then any utility works in `class`. Tailwind's browser
+  build compiles CSS in the visitor's browser and is meant for development; for
+  an app you ship, use your own Tailwind build (below).
 
   ```html
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>

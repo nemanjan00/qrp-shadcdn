@@ -1,7 +1,7 @@
 {
 	"name": "@nemanjan00/qrp-shadcdn",
 	"version": "0.4.1",
-	"description": "shadcn/ui, without React — 50+ shadcn components on qrp, a 5 KB reactive core. Real DOM, no build step required; one import from a CDN, or tree-shaken from npm.",
+	"description": "shadcn/ui, without React — 50+ shadcn components on qrp, a 5 KB reactive core. Real DOM, tree-shaken from npm by any bundler; a single CDN import for prototypes.",
 	"type": "module",
 	"license": "MIT",
 	"main": "./index.js",

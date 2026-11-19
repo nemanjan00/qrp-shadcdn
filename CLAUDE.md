@@ -79,3 +79,12 @@ publish` (the user has authorized publishing). Gate first: test, lint,
 typecheck, check:types, build, demo page loads with no errors.
 
 Keep this file and README.md in sync when conventions change.
+
+## README framing
+
+The README leads with **npm + a bundler**; the CDN bundle (and Tailwind's
+browser build) are documented last and labelled "prototypes only". A consuming
+agent once shipped a real app on the CDN because the README's first snippet was
+the CDN import followed by "no bundler" — don't reintroduce that. Keep the
+"read qrp's SHARP-EDGES / API / RECIPES first" pointer near the top: agents
+learn the API from this README and otherwise guess at qrp's core.

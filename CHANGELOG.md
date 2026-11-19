@@ -7,6 +7,14 @@ can land in a minor — they're marked ⚠️ **BREAKING**. Newest first.
 
 _(nothing yet)_
 
+## 0.4.1
+
+- **Requires `@nemanjan00/qrp` `^0.15.0`.** 0.15.0 adds the `store`
+  (`assign`/`append`/`coalesce`) and `host` (`island`/`reconcile`) modules and
+  `docs/LARGE-APPS.md`. The bundle re-exports only the qrp core, which didn't
+  change, so import those modules from `@nemanjan00/qrp/store` and
+  `@nemanjan00/qrp/host`.
+
 ## 0.4.0
 
 - **Requires `@nemanjan00/qrp` `^0.14.0`.** 0.14.0 adds `socket`, `onChange`,

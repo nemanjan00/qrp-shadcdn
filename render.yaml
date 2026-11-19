@@ -1,7 +1,7 @@
 # render.com blueprint — deploy the demo as a static site.
-# The repo's demo/ loads ../dist and ../node_modules (dev-checkout paths), so the
-# build assembles a self-contained site/ with the bundle, qrp's core and the
-# demo pages, and rewrites the import map to those copies (bin/build-site.js).
+# The repo's demo/ is unbundled (import map to ../dist and ../node_modules), so the
+# build bundles it into one module and inlines the CSS for first paint
+# (bin/build-site.js).
 services:
   - type: web
     name: qrp-shadcdn

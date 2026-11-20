@@ -5,6 +5,13 @@ can land in a minor — they're marked ⚠️ **BREAKING**. Newest first.
 
 ## Unreleased
 
+_(nothing yet)_
+
+## 0.4.2
+
+- **Requires `@nemanjan00/qrp` `^0.15.1`.** 0.15.1 logs a console warning when
+  a second copy of qrp's core loads on the page (two copies don't share
+  reactivity), and documents cleanup with `onDispose`.
 - **README leads with npm + a bundler.** The quick start installs from npm;
   the CDN bundle moved to the end of Install as "prototypes only", with why
   (network dependency, every component loaded, easy to get two copies of qrp).
